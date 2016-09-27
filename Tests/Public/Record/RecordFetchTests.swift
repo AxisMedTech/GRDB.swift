@@ -19,7 +19,7 @@ private class Person : Record {
         super.init()
     }
     
-    static func setupInDatabase(db: Database) throws {
+    static func setup(inDatabase db: Database) throws {
         try db.execute(
             "CREATE TABLE persons (" +
                 "id INTEGER PRIMARY KEY, " +
@@ -30,15 +30,15 @@ private class Person : Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "persons"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         id = row.value(named: "id")
         age = row.value(named: "age")
         name = row.value(named: "name")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -49,16 +49,16 @@ private class Person : Record {
         ]
     }
     
-    override func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    override func didInsert(with rowID: Int64, for column: String?) {
         self.id = rowID
     }
 }
 
 class RecordFetchTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
-        migrator.registerMigration("createPerson", migrate: Person.setupInDatabase)
+        migrator.registerMigration("createPerson", migrate: Person.setup)
         try migrator.migrate(dbWriter)
     }
     
@@ -68,11 +68,11 @@ class RecordFetchTests: GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try Person(name: "Arthur", age: 41).insert(db)
                 try Person(name: "Barbara", age: 37).insert(db)
-                return .Commit
+                return .commit
             }
             
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT * FROM persons WHERE name = ?")
+                let statement = try db.makeSelectStatement("SELECT * FROM persons WHERE name = ?")
                 
                 for name in ["Arthur", "Barbara"] {
                     let person = Person.fetchOne(statement, arguments: [name])!
@@ -98,7 +98,7 @@ class RecordFetchTests: GRDBTestCase {
                 XCTAssertEqual(names2[0]!, "Arthur")
                 XCTAssertEqual(names2[1]!, "Barbara")
                 
-                return .Commit
+                return .commit
             }
         }
     }
@@ -110,7 +110,7 @@ class RecordFetchTests: GRDBTestCase {
                 try Person(name: "Arthur", age: 41).insert(db)
                 try Person(name: "Barbara", age: 37).insert(db)
 
-                let statement = try db.selectStatement("SELECT * FROM persons ORDER BY name")
+                let statement = try db.makeSelectStatement("SELECT * FROM persons ORDER BY name")
                 let personSequence = Person.fetch(statement)
                 var names1: [String?] = personSequence.map { $0.name }
                 var names2: [String?] = personSequence.map { $0.name }
@@ -120,7 +120,7 @@ class RecordFetchTests: GRDBTestCase {
                 XCTAssertEqual(names2[0]!, "Arthur")
                 XCTAssertEqual(names2[1]!, "Barbara")
                 
-                return .Commit
+                return .commit
             }
         }
     }

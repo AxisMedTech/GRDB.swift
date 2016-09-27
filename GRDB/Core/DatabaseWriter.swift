@@ -22,7 +22,7 @@ public protocol DatabaseWriter : DatabaseReader {
     ///
     /// The *block* argument is completely isolated. Eventual concurrent
     /// database updates are postponed until the block has executed.
-    func write<T>(block: (db: Database) throws -> T) rethrows -> T
+    func write<T>(_ block: (Database) throws -> T) rethrows -> T
     
     
     // MARK: - Reading from Database
@@ -54,10 +54,10 @@ public protocol DatabaseWriter : DatabaseReader {
     /// DatabaseQueue.readFromWrite simply runs *block* synchronously, and
     /// returns when the block has completed. In the example above, the
     /// insertion is run after the select.
-    func readFromWrite(block: (db: Database) -> Void)
+    func readFromWrite(_ block: @escaping (Database) -> Void)
 }
 
-extension DatabaseWriter {    
+extension DatabaseWriter {
     
     // MARK: - Transaction Observers
     
@@ -67,21 +67,29 @@ extension DatabaseWriter {
     /// The transaction observer is weakly referenced: it is not retained, and
     /// stops getting notifications after it is deallocated.
     ///
-    /// - parameters:
-    ///     - transactionObserver: A transaction observer.
-    ///     - filter: An optional database event filter. When nil (the default),
-    ///       all events are notified to the observer. When not nil, only events
-    ///       that pass the filter are notified.
-    public func addTransactionObserver(transactionObserver: TransactionObserverType, forDatabaseEvents filter: ((DatabaseEventKind) -> Bool)? = nil) {
+    /// - parameter transactionObserver: A transaction observer.
+    public func add(transactionObserver: TransactionObserver) {
         write { db in
-            db.addTransactionObserver(transactionObserver, forDatabaseEvents: filter)
+            db.add(transactionObserver: transactionObserver)
         }
     }
     
     /// Remove a transaction observer.
-    public func removeTransactionObserver(transactionObserver: TransactionObserverType) {
+    public func remove(transactionObserver: TransactionObserver) {
         write { db in
-            db.removeTransactionObserver(transactionObserver)
+            db.remove(transactionObserver: transactionObserver)
         }
+    }
+}
+
+extension DatabaseWriter {
+    // Addresses https://github.com/groue/GRDB.swift/issues/117 and
+    // https://bugs.swift.org/browse/SR-2623
+    //
+    // This method allows avoiding calling the regular rethrowing `write(_:)`
+    // method from a property of type DatabaseWriter, and crashing the Swift 3
+    // compiler of Xcode 8 GM Version 8.0 (8A218a)
+    func writeForIssue117(_ block: (Database) -> Void) -> Void {
+        write(block)
     }
 }

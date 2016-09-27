@@ -3,44 +3,44 @@
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func == (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .Equal(lhs.sqlExpression, rhs?.sqlExpression ?? .Value(nil))
+public func == (lhs: _SpecificSQLExpressible, rhs: SQLExpressible?) -> _SQLExpression {
+    return .equalOperator(lhs.sqlExpression, rhs?.sqlExpression ?? .value(nil))
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func == (lhs: _SpecificSQLExpressible, rhs: protocol<_SQLExpressible, BooleanType>?) -> _SQLExpression {
+public func == (lhs: _SpecificSQLExpressible, rhs: Bool?) -> _SQLExpression {
     if let rhs = rhs {
-        if rhs.boolValue {
+        if rhs {
             return lhs.sqlExpression
         } else {
-            return .Not(lhs.sqlExpression)
+            return .notOperator(lhs.sqlExpression)
         }
     } else {
-        return .Equal(lhs.sqlExpression, .Value(nil))
+        return .equalOperator(lhs.sqlExpression, .value(nil))
     }
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func == (lhs: _SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .Equal(lhs?.sqlExpression ?? .Value(nil), rhs.sqlExpression)
+public func == (lhs: SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .equalOperator(lhs?.sqlExpression ?? .value(nil), rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func == (lhs: protocol<_SQLExpressible, BooleanType>?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+public func == (lhs: Bool?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
     if let lhs = lhs {
-        if lhs.boolValue {
+        if lhs {
             return rhs.sqlExpression
         } else {
-            return .Not(rhs.sqlExpression)
+            return .notOperator(rhs.sqlExpression)
         }
     } else {
-        return .Equal(.Value(nil), rhs.sqlExpression)
+        return .equalOperator(.value(nil), rhs.sqlExpression)
     }
 }
 
@@ -48,7 +48,7 @@ public func == (lhs: protocol<_SQLExpressible, BooleanType>?, rhs: _SpecificSQLE
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func == (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .Equal(lhs.sqlExpression, rhs.sqlExpression)
+    return .equalOperator(lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -57,44 +57,44 @@ public func == (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func != (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .NotEqual(lhs.sqlExpression, rhs?.sqlExpression ?? .Value(nil))
+public func != (lhs: _SpecificSQLExpressible, rhs: SQLExpressible?) -> _SQLExpression {
+    return .notEqualOperator(lhs.sqlExpression, rhs?.sqlExpression ?? .value(nil))
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func != (lhs: _SpecificSQLExpressible, rhs: protocol<_SQLExpressible, BooleanType>?) -> _SQLExpression {
+public func != (lhs: _SpecificSQLExpressible, rhs: Bool?) -> _SQLExpression {
     if let rhs = rhs {
-        if rhs.boolValue {
-            return .Not(lhs.sqlExpression)
+        if rhs {
+            return .notOperator(lhs.sqlExpression)
         } else {
             return lhs.sqlExpression
         }
     } else {
-        return .NotEqual(lhs.sqlExpression, .Value(nil))
+        return .notEqualOperator(lhs.sqlExpression, .value(nil))
     }
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func != (lhs: _SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .NotEqual(lhs?.sqlExpression ?? .Value(nil), rhs.sqlExpression)
+public func != (lhs: SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .notEqualOperator(lhs?.sqlExpression ?? .value(nil), rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func != (lhs: protocol<_SQLExpressible, BooleanType>?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+public func != (lhs: Bool?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
     if let lhs = lhs {
-        if lhs.boolValue {
-            return .Not(rhs.sqlExpression)
+        if lhs {
+            return .notOperator(rhs.sqlExpression)
         } else {
             return rhs.sqlExpression
         }
     } else {
-        return .NotEqual(.Value(nil), rhs.sqlExpression)
+        return .notEqualOperator(.value(nil), rhs.sqlExpression)
     }
 }
 
@@ -102,7 +102,7 @@ public func != (lhs: protocol<_SQLExpressible, BooleanType>?, rhs: _SpecificSQLE
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func != (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .NotEqual(lhs.sqlExpression, rhs.sqlExpression)
+    return .notEqualOperator(lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -111,22 +111,22 @@ public func != (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func < (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("<", lhs.sqlExpression, rhs.sqlExpression)
+public func < (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("<", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func < (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("<", lhs.sqlExpression, rhs.sqlExpression)
+public func < (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("<", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func < (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("<", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("<", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -135,22 +135,22 @@ public func < (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _S
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func <= (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("<=", lhs.sqlExpression, rhs.sqlExpression)
+public func <= (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("<=", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func <= (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("<=", lhs.sqlExpression, rhs.sqlExpression)
+public func <= (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("<=", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func <= (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("<=", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("<=", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -159,22 +159,22 @@ public func <= (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func > (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator(">", lhs.sqlExpression, rhs.sqlExpression)
+public func > (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator(">", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func > (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator(">", lhs.sqlExpression, rhs.sqlExpression)
+public func > (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator(">", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func > (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator(">", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator(">", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -183,22 +183,22 @@ public func > (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _S
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func >= (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator(">=", lhs.sqlExpression, rhs.sqlExpression)
+public func >= (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator(">=", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func >= (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator(">=", lhs.sqlExpression, rhs.sqlExpression)
+public func >= (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator(">=", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func >= (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator(">=", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator(">=", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -207,22 +207,22 @@ public func >= (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func * (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("*", lhs.sqlExpression, rhs.sqlExpression)
+public func * (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("*", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func * (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("*", lhs.sqlExpression, rhs.sqlExpression)
+public func * (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("*", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func * (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("*", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("*", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -231,22 +231,22 @@ public func * (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _S
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func / (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("/", lhs.sqlExpression, rhs.sqlExpression)
+public func / (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("/", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func / (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("/", lhs.sqlExpression, rhs.sqlExpression)
+public func / (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("/", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func / (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("/", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("/", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -255,22 +255,22 @@ public func / (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _S
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func + (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("+", lhs.sqlExpression, rhs.sqlExpression)
+public func + (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("+", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func + (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("+", lhs.sqlExpression, rhs.sqlExpression)
+public func + (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("+", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func + (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("+", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("+", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -280,7 +280,7 @@ public func + (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _S
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public prefix func - (value: _SpecificSQLExpressible) -> _SQLExpression {
-    return .PrefixOperator("-", value.sqlExpression)
+    return .prefixOperator("-", value.sqlExpression)
 }
 
 
@@ -289,22 +289,22 @@ public prefix func - (value: _SpecificSQLExpressible) -> _SQLExpression {
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func - (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("-", lhs.sqlExpression, rhs.sqlExpression)
+public func - (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("-", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func - (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("-", lhs.sqlExpression, rhs.sqlExpression)
+public func - (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("-", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL arithmetic expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func - (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("-", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("-", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -313,67 +313,77 @@ public func - (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _S
 /// Returns an SQL logical expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func && (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("AND", lhs.sqlExpression, rhs.sqlExpression)
+public func && (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("AND", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL logical expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func && (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("AND", lhs.sqlExpression, rhs.sqlExpression)
+public func && (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("AND", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL logical expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func && (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("AND", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("AND", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
 // MARK: - Operator BETWEEN
 
-extension Range where Element: protocol<_SQLExpressible, BidirectionalIndexType> {
+extension Range where Bound: SQLExpressible {
     /// Returns an SQL expression that checks the inclusion of a value in
     /// a range.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SpecificSQLExpressible) -> _SQLExpression {
-        return .Between(value: element.sqlExpression, min: startIndex.sqlExpression, max: endIndex.predecessor().sqlExpression)
+    public func contains(_ element: _SpecificSQLExpressible) -> _SQLExpression {
+        return (element >= lowerBound) && (element < upperBound)
     }
 }
 
-extension ClosedInterval where Bound: _SQLExpressible {
+extension ClosedRange where Bound: SQLExpressible {
     /// Returns an SQL expression that checks the inclusion of a value in
-    /// an interval.
+    /// an range.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SpecificSQLExpressible) -> _SQLExpression {
-        return .Between(value: element.sqlExpression, min: start.sqlExpression, max: end.sqlExpression)
+    public func contains(_ element: _SpecificSQLExpressible) -> _SQLExpression {
+        return .between(value: element.sqlExpression, min: lowerBound.sqlExpression, max: upperBound.sqlExpression)
     }
 }
 
-extension HalfOpenInterval where Bound: _SQLExpressible {
+extension CountableRange where Bound: SQLExpressible {
     /// Returns an SQL expression that checks the inclusion of a value in
-    /// an interval.
+    /// a range.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SpecificSQLExpressible) -> _SQLExpression {
-        return (element >= start) && (element < end)
+    public func contains(_ element: _SpecificSQLExpressible) -> _SQLExpression {
+        return .between(value: element.sqlExpression, min: lowerBound.sqlExpression, max: upperBound.advanced(by: -1).sqlExpression)
+    }
+}
+
+extension CountableClosedRange where Bound: SQLExpressible {
+    /// Returns an SQL expression that checks the inclusion of a value in
+    /// a range.
+    ///
+    /// See https://github.com/groue/GRDB.swift/#sql-operators
+    public func contains(_ element: _SpecificSQLExpressible) -> _SQLExpression {
+        return .between(value: element.sqlExpression, min: lowerBound.sqlExpression, max: upperBound.sqlExpression)
     }
 }
 
 
 // MARK: - Operator IN
 
-extension SequenceType where Self.Generator.Element: _SQLExpressible {
+extension Sequence where Self.Iterator.Element: SQLExpressible {
     /// Returns an SQL expression that checks the inclusion of a value in
     /// a sequence.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SpecificSQLExpressible) -> _SQLExpression {
-        return .In(map { $0.sqlExpression }, element.sqlExpression)
+    public func contains(_ element: _SpecificSQLExpressible) -> _SQLExpression {
+        return .inOperator(map { $0.sqlExpression }, element.sqlExpression)
     }
 }
 
@@ -383,22 +393,22 @@ extension SequenceType where Self.Generator.Element: _SQLExpressible {
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func === (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .Is(lhs.sqlExpression, rhs?.sqlExpression ?? .Value(nil))
+public func === (lhs: _SpecificSQLExpressible, rhs: SQLExpressible?) -> _SQLExpression {
+    return .isOperator(lhs.sqlExpression, rhs?.sqlExpression ?? .value(nil))
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func === (lhs: _SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .Is(lhs?.sqlExpression ?? .Value(nil), rhs.sqlExpression)
+public func === (lhs: SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .isOperator(lhs?.sqlExpression ?? .value(nil), rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func === (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .Is(lhs.sqlExpression, rhs.sqlExpression)
+    return .isOperator(lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -407,22 +417,22 @@ public func === (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func !== (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .IsNot(lhs.sqlExpression, rhs?.sqlExpression ?? .Value(nil))
+public func !== (lhs: _SpecificSQLExpressible, rhs: SQLExpressible?) -> _SQLExpression {
+    return .isNotOperator(lhs.sqlExpression, rhs?.sqlExpression ?? .value(nil))
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func !== (lhs: _SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .IsNot(lhs?.sqlExpression ?? .Value(nil), rhs.sqlExpression)
+public func !== (lhs: SQLExpressible?, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .isNotOperator(lhs?.sqlExpression ?? .value(nil), rhs.sqlExpression)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func !== (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .IsNot(lhs.sqlExpression, rhs.sqlExpression)
+    return .isNotOperator(lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -431,22 +441,22 @@ public func !== (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> 
 /// Returns an SQL logical expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func || (lhs: _SpecificSQLExpressible, rhs: _SQLExpressible) -> _SQLExpression {
-    return .InfixOperator("OR", lhs.sqlExpression, rhs.sqlExpression)
+public func || (lhs: _SpecificSQLExpressible, rhs: SQLExpressible) -> _SQLExpression {
+    return .infixOperator("OR", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL logical expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func || (lhs: _SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("OR", lhs.sqlExpression, rhs.sqlExpression)
+public func || (lhs: SQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
+    return .infixOperator("OR", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 /// Returns an SQL logical expression.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public func || (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _SQLExpression {
-    return .InfixOperator("OR", lhs.sqlExpression, rhs.sqlExpression)
+    return .infixOperator("OR", lhs.sqlExpression, rhs.sqlExpression)
 }
 
 
@@ -456,5 +466,5 @@ public func || (lhs: _SpecificSQLExpressible, rhs: _SpecificSQLExpressible) -> _
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
 public prefix func ! (value: _SpecificSQLExpressible) -> _SQLExpression {
-    return .Not(value.sqlExpression)
+    return .notOperator(value.sqlExpression)
 }

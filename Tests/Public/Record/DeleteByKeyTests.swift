@@ -8,21 +8,17 @@ import XCTest
 #endif
 
 private struct Person : TableMapping {
-    static func databaseTableName() -> String {
-        return "persons"
-    }
+    static let databaseTableName = "persons"
 }
 
 private struct Citizenship : TableMapping {
-    static func databaseTableName() -> String {
-        return "citizenships"
-    }
+    static let databaseTableName = "citizenships"
 }
 
 
 class DeleteByKeyTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         try dbWriter.write { db in
             try db.execute("CREATE TABLE persons (id INTEGER PRIMARY KEY, name TEXT, email TEXT UNIQUE)")
             try db.execute("CREATE TABLE citizenships (personId INTEGER NOT NULL, countryIsoCode TEXT NOT NULL, PRIMARY KEY (personId, countryIsoCode))")

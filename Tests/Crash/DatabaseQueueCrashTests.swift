@@ -16,7 +16,7 @@ class DatabaseQueueCrashTests: GRDBCrashTestCase {
     func testInDatabaseIsNotReentrant() {
         assertCrash("Database methods are not reentrant.") {
             dbQueue.inDatabase { db in
-                self.dbQueue.inDatabase { db in
+                dbQueue.inDatabase { db in
                 }
             }
         }
@@ -25,8 +25,8 @@ class DatabaseQueueCrashTests: GRDBCrashTestCase {
     func testInTransactionInsideInDatabaseIsNotReentrant() {
         assertCrash("Database methods are not reentrant.") {
             try dbQueue.inDatabase { db in
-                try self.dbQueue.inTransaction { db in
-                    return .Commit
+                try dbQueue.inTransaction { db in
+                    return .commit
                 }
             }
         }
@@ -35,10 +35,10 @@ class DatabaseQueueCrashTests: GRDBCrashTestCase {
     func testInTransactionIsNotReentrant() {
         assertCrash("Database methods are not reentrant.") {
             try dbQueue.inTransaction { db in
-                try self.dbQueue.inTransaction { db in
-                    return .Commit
+                try dbQueue.inTransaction { db in
+                    return .commit
                 }
-                return .Commit
+                return .commit
             }
         }
     }
@@ -54,18 +54,18 @@ class DatabaseQueueCrashTests: GRDBCrashTestCase {
                 try db.execute("CREATE TABLE persons (name TEXT)")
                 rows = Row.fetch(db, "SELECT * FROM persons")
             }
-            _ = rows!.generate()
+            _ = rows!.makeIterator()
         }
     }
     
     func testRowSequenceCanNotBeIteratedOutsideOfDatabaseQueue() {
         assertCrash("Database was not used on the correct thread: execute your statements inside DatabaseQueue.inDatabase() or DatabaseQueue.inTransaction(). If you get this error while iterating the result of a fetch() method, consider using the array returned by fetchAll() instead.") {
-            var generator: DatabaseGenerator<Row>?
+            var iterator: DatabaseIterator<Row>?
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE persons (name TEXT)")
-                generator = Row.fetch(db, "SELECT * FROM persons").generate()
+                iterator = Row.fetch(db, "SELECT * FROM persons").makeIterator()
             }
-            _ = generator!.next()
+            _ = iterator!.next()
         }
     }
     
@@ -86,9 +86,9 @@ class DatabaseQueueCrashTests: GRDBCrashTestCase {
             queue.maxConcurrentOperationCount = 2
             queue.addOperation(NSBlockOperation {
                 do {
-                    try dbQueue1.inTransaction(.Exclusive) { db in
+                    try dbQueue1.inTransaction(.exclusive) { db in
                         sleep(2)    // let other queue try to read.
-                        return .Commit
+                        return .commit
                     }
                 }
                 catch is DatabaseError {

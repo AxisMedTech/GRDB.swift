@@ -8,7 +8,7 @@ public struct QueryInterfaceRequest<T> {
     ///
     /// It represents the SQL query `SELECT * FROM tableName`.
     public init(tableName: String) {
-        self.init(query: _SQLSelectQuery(select: [_SQLResultColumn.Star(nil)], from: .Table(name: tableName, alias: nil)))
+        self.init(query: _SQLSelectQuery(select: [_SQLResultColumn.star(nil)], from: .table(name: tableName, alias: nil)))
     }
     
     init(query: _SQLSelectQuery) {
@@ -22,13 +22,12 @@ extension QueryInterfaceRequest : FetchRequest {
     /// Returns a prepared statement that is ready to be executed.
     ///
     /// - throws: A DatabaseError whenever SQLite could not parse the sql query.
-    @warn_unused_result
-    public func prepare(db: Database) throws -> (SelectStatement, RowAdapter?) {
+    public func prepare(_ db: Database) throws -> (SelectStatement, RowAdapter?) {
         // TODO: split statement generation from arguments building
-        var arguments = StatementArguments()
-        let sql = try query.sql(db, &arguments)
-        let statement = try db.selectStatement(sql)
-        try statement.setArgumentsWithValidation(arguments)
+        var arguments: StatementArguments? = StatementArguments()
+        let sql = query.sql(&arguments)
+        let statement = try db.makeSelectStatement(sql)
+        try statement.setArgumentsWithValidation(arguments!)
         return (statement, nil)
     }
 }
@@ -40,7 +39,7 @@ extension QueryInterfaceRequest where T: RowConvertible {
     
     /// Returns a sequence of values.
     ///
-    ///     let nameColumn = SQLColumn("name")
+    ///     let nameColumn = Column("name")
     ///     let request = Person.order(nameColumn)
     ///     let persons = request.fetch(db) // DatabaseSequence<Person>
     ///
@@ -55,32 +54,29 @@ extension QueryInterfaceRequest where T: RowConvertible {
     ///
     /// If the database is modified while the sequence is iterating, the
     /// remaining elements are undefined.
-    @warn_unused_result
-    public func fetch(db: Database) -> DatabaseSequence<T> {
+    public func fetch(_ db: Database) -> DatabaseSequence<T> {
         return T.fetch(db, self)
     }
     
     /// Returns an array of values fetched from a fetch request.
     ///
-    ///     let nameColumn = SQLColumn("name")
+    ///     let nameColumn = Column("name")
     ///     let request = Person.order(nameColumn)
     ///     let persons = request.fetchAll(db) // [Person]
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public func fetchAll(db: Database) -> [T] {
+    public func fetchAll(_ db: Database) -> [T] {
         return T.fetchAll(db, self)
     }
     
     /// Returns a single value fetched from a fetch request.
     ///
-    ///     let nameColumn = SQLColumn("name")
+    ///     let nameColumn = Column("name")
     ///     let request = Person.order(nameColumn)
     ///     let person = request.fetchOne(db) // Person?
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public func fetchOne(db: Database) -> T? {
+    public func fetchOne(_ db: Database) -> T? {
         return T.fetchOne(db, self)
     }
 }
@@ -91,39 +87,35 @@ extension QueryInterfaceRequest {
     // MARK: Request Derivation
     
     /// Returns a new QueryInterfaceRequest with a new net of selected columns.
-    @warn_unused_result
-    public func select(selection: _SQLSelectable...) -> QueryInterfaceRequest<T> {
+    public func select(_ selection: _SQLSelectable...) -> QueryInterfaceRequest<T> {
         return select(selection)
     }
     
     /// Returns a new QueryInterfaceRequest with a new net of selected columns.
-    @warn_unused_result
-    public func select(selection: [_SQLSelectable]) -> QueryInterfaceRequest<T> {
+    public func select(_ selection: [_SQLSelectable]) -> QueryInterfaceRequest<T> {
         var query = self.query
         query.selection = selection
         return QueryInterfaceRequest(query: query)
     }
     
     /// Returns a new QueryInterfaceRequest with a new net of selected columns.
-    @warn_unused_result
-    public func select(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
-        return select(_SQLExpression.Literal(sql, arguments))
+    public func select(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
+        return select(_SQLExpression.sqlLiteral(sql, arguments))
     }
     
     /// Returns a new QueryInterfaceRequest which returns distinct rows.
-    public var distinct: QueryInterfaceRequest<T> {
+    public func distinct() -> QueryInterfaceRequest<T> {
         var query = self.query
-        query.distinct = true
+        query.isDistinct = true
         return QueryInterfaceRequest(query: query)
     }
     
     /// Returns a new QueryInterfaceRequest with the provided *predicate* added to the
     /// eventual set of already applied predicates.
-    @warn_unused_result
-    public func filter(predicate: _SQLExpressible) -> QueryInterfaceRequest<T> {
+    public func filter(_ predicate: SQLExpressible) -> QueryInterfaceRequest<T> {
         var query = self.query
         if let whereExpression = query.whereExpression {
-            query.whereExpression = .InfixOperator("AND", whereExpression, predicate.sqlExpression)
+            query.whereExpression = .infixOperator("AND", whereExpression, predicate.sqlExpression)
         } else {
             query.whereExpression = predicate.sqlExpression
         }
@@ -132,35 +124,30 @@ extension QueryInterfaceRequest {
     
     /// Returns a new QueryInterfaceRequest with the provided *predicate* added to the
     /// eventual set of already applied predicates.
-    @warn_unused_result
-    public func filter(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
-        return filter(_SQLExpression.Literal(sql, arguments))
+    public func filter(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
+        return filter(_SQLExpression.sqlLiteral(sql, arguments))
     }
     
     /// Returns a new QueryInterfaceRequest grouped according to *expressions*.
-    @warn_unused_result
-    public func group(expressions: _SQLExpressible...) -> QueryInterfaceRequest<T> {
+    public func group(_ expressions: SQLExpressible...) -> QueryInterfaceRequest<T> {
         return group(expressions)
     }
     
     /// Returns a new QueryInterfaceRequest grouped according to *expressions*.
-    @warn_unused_result
-    public func group(expressions: [_SQLExpressible]) -> QueryInterfaceRequest<T> {
+    public func group(_ expressions: [SQLExpressible]) -> QueryInterfaceRequest<T> {
         var query = self.query
         query.groupByExpressions = expressions.map { $0.sqlExpression }
         return QueryInterfaceRequest(query: query)
     }
     
     /// Returns a new QueryInterfaceRequest with a new grouping.
-    @warn_unused_result
-    public func group(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
-        return group(_SQLExpression.Literal(sql, arguments))
+    public func group(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
+        return group(_SQLExpression.sqlLiteral(sql, arguments))
     }
     
     /// Returns a new QueryInterfaceRequest with the provided *predicate* added to the
     /// eventual set of already applied predicates.
-    @warn_unused_result
-    public func having(predicate: _SQLExpressible) -> QueryInterfaceRequest<T> {
+    public func having(_ predicate: SQLExpressible) -> QueryInterfaceRequest<T> {
         var query = self.query
         if let havingExpression = query.havingExpression {
             query.havingExpression = (havingExpression && predicate).sqlExpression
@@ -172,46 +159,40 @@ extension QueryInterfaceRequest {
     
     /// Returns a new QueryInterfaceRequest with the provided *sql* added to
     /// the eventual set of already applied predicates.
-    @warn_unused_result
-    public func having(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
-        return having(_SQLExpression.Literal(sql, arguments))
+    public func having(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
+        return having(_SQLExpression.sqlLiteral(sql, arguments))
     }
     
     /// Returns a new QueryInterfaceRequest with the provided *orderings* added to
     /// the eventual set of already applied orderings.
-    @warn_unused_result
-    public func order(orderings: _SQLOrdering...) -> QueryInterfaceRequest<T> {
+    public func order(_ orderings: _SQLOrderable...) -> QueryInterfaceRequest<T> {
         return order(orderings)
     }
     
     /// Returns a new QueryInterfaceRequest with the provided *orderings* added to
     /// the eventual set of already applied orderings.
-    @warn_unused_result
-    public func order(orderings: [_SQLOrdering]) -> QueryInterfaceRequest<T> {
+    public func order(_ orderings: [_SQLOrderable]) -> QueryInterfaceRequest<T> {
         var query = self.query
-        query.orderings.appendContentsOf(orderings)
+        query.orderings = orderings
         return QueryInterfaceRequest(query: query)
     }
     
     /// Returns a new QueryInterfaceRequest with the provided *sql* added to the
     /// eventual set of already applied orderings.
-    @warn_unused_result
-    public func order(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
-        return order([_SQLExpression.Literal(sql, arguments)])
+    public func order(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<T> {
+        return order([_SQLExpression.sqlLiteral(sql, arguments)])
     }
     
     /// Returns a new QueryInterfaceRequest sorted in reversed order.
-    @warn_unused_result
-    public func reverse() -> QueryInterfaceRequest<T> {
+    public func reversed() -> QueryInterfaceRequest<T> {
         var query = self.query
-        query.reversed = !query.reversed
+        query.isReversed = !query.isReversed
         return QueryInterfaceRequest(query: query)
     }
     
     /// Returns a QueryInterfaceRequest which fetches *limit* rows, starting at
     /// *offset*.
-    @warn_unused_result
-    public func limit(limit: Int, offset: Int? = nil) -> QueryInterfaceRequest<T> {
+    public func limit(_ limit: Int, offset: Int? = nil) -> QueryInterfaceRequest<T> {
         var query = self.query
         query.limit = _SQLLimit(limit: limit, offset: offset)
         return QueryInterfaceRequest(query: query)
@@ -226,9 +207,24 @@ extension QueryInterfaceRequest {
     /// Returns the number of rows matched by the request.
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public func fetchCount(db: Database) -> Int {
+    public func fetchCount(_ db: Database) -> Int {
         return Int.fetchOne(db, QueryInterfaceRequest(query: query.countQuery))!
+    }
+}
+
+
+extension QueryInterfaceRequest {
+    
+    // MARK: Deleting
+    
+    /// Deletes matching rows; returns the number of deleted rows.
+    ///
+    /// - parameter db: A database connection.
+    /// - returns: The number of deleted rows
+    /// - throws: A DatabaseError is thrown whenever an SQLite error occurs.
+    @discardableResult public func deleteAll(_ db: Database) throws -> Int {
+        try query.makeDeleteStatement(db).execute()
+        return db.changesCount
     }
 }
 
@@ -239,14 +235,14 @@ extension QueryInterfaceRequest {
     
     /// Returns an SQL expression that checks the inclusion of a value in
     /// the results of another request.
-    public func contains(element: _SQLExpressible) -> _SQLExpression {
-        return .InSubQuery(query, element.sqlExpression)
+    public func contains(_ element: SQLExpressible) -> _SQLExpression {
+        return .inSubQuery(query, element.sqlExpression)
     }
     
     /// Returns an SQL expression that checks whether the receiver, as a
     /// subquery, returns any row.
-    public var exists: _SQLExpression {
-        return .Exists(query)
+    public func exists() -> _SQLExpression {
+        return .exists(query)
     }
 }
 
@@ -256,65 +252,55 @@ extension TableMapping {
     // MARK: Request Derivation
     
     /// Returns a QueryInterfaceRequest which fetches all rows in the table.
-    @warn_unused_result
     public static func all() -> QueryInterfaceRequest<Self> {
-        return QueryInterfaceRequest(tableName: databaseTableName())
+        return QueryInterfaceRequest(tableName: databaseTableName)
     }
     
     /// Returns a QueryInterfaceRequest which selects *selection*.
-    @warn_unused_result
-    public static func select(selection: _SQLSelectable...) -> QueryInterfaceRequest<Self> {
+    public static func select(_ selection: _SQLSelectable...) -> QueryInterfaceRequest<Self> {
         return all().select(selection)
     }
     
     /// Returns a QueryInterfaceRequest which selects *selection*.
-    @warn_unused_result
-    public static func select(selection: [_SQLSelectable]) -> QueryInterfaceRequest<Self> {
+    public static func select(_ selection: [_SQLSelectable]) -> QueryInterfaceRequest<Self> {
         return all().select(selection)
     }
     
     /// Returns a QueryInterfaceRequest which selects *sql*.
-    @warn_unused_result
-    public static func select(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<Self> {
+    public static func select(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<Self> {
         return all().select(sql: sql, arguments: arguments)
     }
     
     /// Returns a QueryInterfaceRequest with the provided *predicate*.
-    @warn_unused_result
-    public static func filter(predicate: _SQLExpressible) -> QueryInterfaceRequest<Self> {
+    public static func filter(_ predicate: SQLExpressible) -> QueryInterfaceRequest<Self> {
         return all().filter(predicate)
     }
     
     /// Returns a QueryInterfaceRequest with the provided *predicate*.
-    @warn_unused_result
-    public static func filter(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<Self> {
+    public static func filter(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<Self> {
         return all().filter(sql: sql, arguments: arguments)
     }
     
     /// Returns a QueryInterfaceRequest sorted according to the
     /// provided *orderings*.
-    @warn_unused_result
-    public static func order(orderings: _SQLOrdering...) -> QueryInterfaceRequest<Self> {
+    public static func order(_ orderings: _SQLOrderable...) -> QueryInterfaceRequest<Self> {
         return all().order(orderings)
     }
     
     /// Returns a QueryInterfaceRequest sorted according to the
     /// provided *orderings*.
-    @warn_unused_result
-    public static func order(orderings: [_SQLOrdering]) -> QueryInterfaceRequest<Self> {
+    public static func order(_ orderings: [_SQLOrderable]) -> QueryInterfaceRequest<Self> {
         return all().order(orderings)
     }
     
     /// Returns a QueryInterfaceRequest sorted according to *sql*.
-    @warn_unused_result
-    public static func order(sql sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<Self> {
+    public static func order(sql: String, arguments: StatementArguments? = nil) -> QueryInterfaceRequest<Self> {
         return all().order(sql: sql, arguments: arguments)
     }
     
     /// Returns a QueryInterfaceRequest which fetches *limit* rows, starting at
     /// *offset*.
-    @warn_unused_result
-    public static func limit(limit: Int, offset: Int? = nil) -> QueryInterfaceRequest<Self> {
+    public static func limit(_ limit: Int, offset: Int? = nil) -> QueryInterfaceRequest<Self> {
         return all().limit(limit, offset: offset)
     }
 }
@@ -327,9 +313,23 @@ extension TableMapping {
     /// Returns the number of records.
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public static func fetchCount(db: Database) -> Int {
+    public static func fetchCount(_ db: Database) -> Int {
         return all().fetchCount(db)
+    }
+}
+
+
+extension TableMapping {
+    
+    // MARK: Deleting
+    
+    /// Deletes all records; returns the number of deleted rows.
+    ///
+    /// - parameter db: A database connection.
+    /// - returns: The number of deleted rows
+    /// - throws: A DatabaseError is thrown whenever an SQLite error occurs.
+    @discardableResult public static func deleteAll(_ db: Database) throws -> Int {
+        return try all().deleteAll(db)
     }
 }
 
@@ -353,8 +353,7 @@ extension RowConvertible where Self: TableMapping {
     ///
     /// If the database is modified while the sequence is iterating, the
     /// remaining elements are undefined.
-    @warn_unused_result
-    public static func fetch(db: Database) -> DatabaseSequence<Self> {
+    public static func fetch(_ db: Database) -> DatabaseSequence<Self> {
         return all().fetch(db)
     }
     
@@ -363,8 +362,7 @@ extension RowConvertible where Self: TableMapping {
     ///     let persons = Person.fetchAll(db) // [Person]
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public static func fetchAll(db: Database) -> [Self] {
+    public static func fetchAll(_ db: Database) -> [Self] {
         return all().fetchAll(db)
     }
     
@@ -373,8 +371,7 @@ extension RowConvertible where Self: TableMapping {
     ///     let person = Person.fetchOne(db) // Person?
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public static func fetchOne(db: Database) -> Self? {
+    public static func fetchOne(_ db: Database) -> Self? {
         return all().fetchOne(db)
     }
 }

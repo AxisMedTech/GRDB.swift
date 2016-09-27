@@ -10,13 +10,13 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     
     // MARK: - Initialization
     
-    /// Returns a fetched records controller initialized from a SQL query and
+    /// Creates a fetched records controller initialized from a SQL query and
     /// its eventual arguments.
     ///
     ///     let controller = FetchedRecordsController<Wine>(
     ///         dbQueue,
     ///         sql: "SELECT * FROM wines WHERE color = ? ORDER BY name",
-    ///         arguments: [Color.Red],
+    ///         arguments: [Color.red],
     ///         isSameRecord: { (wine1, wine2) in wine1.id == wine2.id })
     ///
     /// - parameters:
@@ -36,14 +36,14 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     ///
     ///         This function should return true if the two records have the
     ///         same identity. For example, they have the same id.
-    public convenience init(_ databaseWriter: DatabaseWriter, sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil, queue: dispatch_queue_t = dispatch_get_main_queue(), isSameRecord: ((Record, Record) -> Bool)? = nil) {
+    public convenience init(_ databaseWriter: DatabaseWriter, sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil, queue: DispatchQueue = .main, isSameRecord: ((Record, Record) -> Bool)? = nil) {
         self.init(databaseWriter, request: SQLFetchRequest(sql: sql, arguments: arguments, adapter: adapter), queue: queue, isSameRecord: isSameRecord)
     }
     
-    /// Returns a fetched records controller initialized from a fetch request
+    /// Creates a fetched records controller initialized from a fetch request
     /// from the [Query Interface](https://github.com/groue/GRDB.swift#the-query-interface).
     ///
-    ///     let request = Wine.order(SQLColumn("name"))
+    ///     let request = Wine.order(Column("name"))
     ///     let controller = FetchedRecordsController<Wine>(
     ///         dbQueue,
     ///         request: request,
@@ -64,7 +64,7 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     ///
     ///         This function should return true if the two records have the
     ///         same identity. For example, they have the same id.
-    public convenience init(_ databaseWriter: DatabaseWriter, request: FetchRequest, queue: dispatch_queue_t = dispatch_get_main_queue(), isSameRecord: ((Record, Record) -> Bool)? = nil) {
+    public convenience init(_ databaseWriter: DatabaseWriter, request: FetchRequest, queue: DispatchQueue = .main, isSameRecord: ((Record, Record) -> Bool)? = nil) {
         if let isSameRecord = isSameRecord {
             self.init(databaseWriter, request: request, queue: queue, isSameItemFactory: { _ in { isSameRecord($0.record, $1.record) } })
         } else {
@@ -72,7 +72,7 @@ public final class FetchedRecordsController<Record: RowConvertible> {
         }
     }
     
-    private init(_ databaseWriter: DatabaseWriter, request: FetchRequest, queue: dispatch_queue_t, isSameItemFactory: (Database) -> (Item<Record>, Item<Record>) -> Bool) {
+    fileprivate init(_ databaseWriter: DatabaseWriter, request: FetchRequest, queue: DispatchQueue, isSameItemFactory: @escaping (Database) -> (Item<Record>, Item<Record>) -> Bool) {
         self.request = request
         self.databaseWriter = databaseWriter
         self.isSameItem = { _ in return false }
@@ -95,17 +95,17 @@ public final class FetchedRecordsController<Record: RowConvertible> {
         // Fetch items on the writing dispatch queue, so that the transaction
         // observer is added on the same serialized queue as transaction
         // callbacks.
-        databaseWriter.write { db in
-            let (statement, adapter) = try! self.request.prepare(db)
+        databaseWriter.writeForIssue117 { db in
+            let (statement, adapter) = try! request.prepare(db)
             let initialItems = Item<Record>.fetchAll(statement, adapter: adapter)
-            self.fetchedItems = initialItems
-            self.isSameItem = self.isSameItemFactory(db)
+            fetchedItems = initialItems
+            isSameItem = isSameItemFactory(db)
             
             if let checkForChanges = checkForChanges {
-                let observer = FetchedRecordsObserver(checkForChanges)
+                let observer = FetchedRecordsObserver(readInfo: statement.readInfo, checkForChanges: checkForChanges)
                 self.observer = observer
                 observer.items = initialItems
-                db.addTransactionObserver(observer, forDatabaseEvents: databaseEventFilter(statement.readTables))
+                db.add(transactionObserver: observer)
             }
         }
     }
@@ -122,12 +122,12 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     /// The dispatch queue on which the controller must be used.
     ///
     /// Unless specified otherwise at initialization time, it is the main queue.
-    public let queue: dispatch_queue_t
+    public let queue: DispatchQueue
     
     /// Updates the fetch request, and notifies the delegate of changes in the
     /// fetched records if delegate is not nil, and performFetch() has been
     /// called.
-    public func setRequest(request: FetchRequest) {
+    public func setRequest(_ request: FetchRequest) {
         // We don't provide a setter for the request property because we need a
         // non-optional request.
         self.request = request
@@ -136,7 +136,7 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     /// Updates the fetch request, and notifies the delegate of changes in the
     /// fetched records if delegate is not nil, and performFetch() has been
     /// called.
-    public func setRequest(sql sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) {
+    public func setRequest(sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) {
         setRequest(SQLFetchRequest(sql: sql, arguments: arguments, adapter: adapter))
     }
     
@@ -149,20 +149,22 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     ///       removed, moved, or updated.
     ///     - recordsDidChange: Invoked after records have been updated.
     public func trackChanges(
-        recordsWillChange recordsWillChange: ((controller: FetchedRecordsController<Record>) -> ())? = nil,
-        tableViewEvent: ((controller: FetchedRecordsController<Record>, record: Record, event: TableViewEvent) -> ())? = nil,
-        recordsDidChange: ((controller: FetchedRecordsController<Record>) -> ())? = nil)
+        recordsWillChange: ((FetchedRecordsController<Record>) -> ())? = nil,
+        tableViewEvent: ((FetchedRecordsController<Record>, Record, TableViewEvent) -> ())? = nil,
+        recordsDidChange: ((FetchedRecordsController<Record>) -> ())? = nil)
     {
-        let recordsWillChangeWithVoidAlongside: ((controller: FetchedRecordsController<Record>, fetchedAlongside: Void) -> ())?
+        let recordsWillChangeWithVoidAlongside: ((FetchedRecordsController<Record>, Void) -> ())?
         if let recordsWillChange = recordsWillChange {
-            recordsWillChangeWithVoidAlongside = { (controller, _) in recordsWillChange(controller: controller) }
+            recordsWillChangeWithVoidAlongside = { (controller, _) in
+                recordsWillChange(controller)
+            }
         } else {
             recordsWillChangeWithVoidAlongside = nil
         }
         
-        let recordsDidChangeWithVoidAlongside: ((controller: FetchedRecordsController<Record>, fetchedAlongside: Void) -> ())?
+        let recordsDidChangeWithVoidAlongside: ((FetchedRecordsController<Record>, Void) -> ())?
         if let recordsDidChange = recordsDidChange {
-            recordsDidChangeWithVoidAlongside = { (controller, _) in recordsDidChange(controller: controller) }
+            recordsDidChangeWithVoidAlongside = { (controller, _) in recordsDidChange(controller) }
         } else {
             recordsDidChangeWithVoidAlongside = nil
         }
@@ -180,19 +182,19 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     ///     - recordsWillChange: Invoked before records are updated.
     ///     - recordsDidChange: Invoked after records have been updated.
     public func trackChanges(
-        recordsWillChange recordsWillChange: ((controller: FetchedRecordsController<Record>) -> ())? = nil,
-        recordsDidChange: ((controller: FetchedRecordsController<Record>) -> ())? = nil)
+        recordsWillChange: ((FetchedRecordsController<Record>) -> ())? = nil,
+        recordsDidChange: ((FetchedRecordsController<Record>) -> ())? = nil)
     {
-        let recordsWillChangeWithVoidAlongside: ((controller: FetchedRecordsController<Record>, fetchedAlongside: Void) -> ())?
+        let recordsWillChangeWithVoidAlongside: ((FetchedRecordsController<Record>, Void) -> ())?
         if let recordsWillChange = recordsWillChange {
-            recordsWillChangeWithVoidAlongside = { (controller, _) in recordsWillChange(controller: controller) }
+            recordsWillChangeWithVoidAlongside = { (controller, _) in recordsWillChange(controller) }
         } else {
             recordsWillChangeWithVoidAlongside = nil
         }
         
-        let recordsDidChangeWithVoidAlongside: ((controller: FetchedRecordsController<Record>, fetchedAlongside: Void) -> ())?
+        let recordsDidChangeWithVoidAlongside: ((FetchedRecordsController<Record>, Void) -> ())?
         if let recordsDidChange = recordsDidChange {
-            recordsDidChangeWithVoidAlongside = { (controller, _) in recordsDidChange(controller: controller) }
+            recordsDidChangeWithVoidAlongside = { (controller, _) in recordsDidChange(controller) }
         } else {
             recordsDidChangeWithVoidAlongside = nil
         }
@@ -219,10 +221,10 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     ///       removed, moved, or updated.
     ///     - recordsDidChange: Invoked after records have been updated.
     public func trackChanges<T>(
-        fetchAlongside fetchAlongside: (Database) -> T,
-        recordsWillChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())? = nil,
-        tableViewEvent: ((controller: FetchedRecordsController<Record>, record: Record, event: TableViewEvent) -> ())? = nil,
-        recordsDidChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())? = nil)
+        fetchAlongside: @escaping (Database) -> T,
+        recordsWillChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())? = nil,
+        tableViewEvent: ((FetchedRecordsController<Record>, Record, TableViewEvent) -> ())? = nil,
+        recordsDidChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())? = nil)
     {
         // If some changes are currently processed, make sure they are
         // discarded because they would trigger previously set callbacks.
@@ -235,10 +237,10 @@ public final class FetchedRecordsController<Record: RowConvertible> {
         }
         
         let initialItems = fetchedItems
-        databaseWriter.write { db in
+        databaseWriter.writeForIssue117 { db in
             let fetchedChangesController = FetchedChangesController(
                 controller: self,
-                isSameItem: self.isSameItemFactory(db),
+                isSameItem: isSameItemFactory(db),
                 fetchAlongside: fetchAlongside,
                 recordsWillChange: recordsWillChange,
                 tableViewEvent: tableViewEvent,
@@ -249,12 +251,12 @@ public final class FetchedRecordsController<Record: RowConvertible> {
                 fetchedChangesController.checkForChanges(observer)
             }
 
-            let (statement, _) = try! self.request.prepare(db)
-            let observer = FetchedRecordsObserver(checkForChanges)
+            let (statement, _) = try! request.prepare(db)
+            let observer = FetchedRecordsObserver(readInfo: statement.readInfo, checkForChanges: checkForChanges)
             self.observer = observer
             if let initialItems = initialItems {
                 observer.items = initialItems
-                db.addTransactionObserver(observer, forDatabaseEvents: databaseEventFilter(statement.readTables))
+                db.add(transactionObserver: observer)
                 observer.performChangesChecking()
             }
         }
@@ -272,9 +274,9 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     ///     - recordsWillChange: Invoked before records are updated.
     ///     - recordsDidChange: Invoked after records have been updated.
     public func trackChanges<T>(
-        fetchAlongside fetchAlongside: (Database) -> T,
-        recordsWillChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())? = nil,
-        recordsDidChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())? = nil)
+        fetchAlongside: @escaping (Database) -> T,
+        recordsWillChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())? = nil,
+        recordsDidChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())? = nil)
     {
         // If some changes are currently processed, make sure they are
         // discarded because they would trigger previously set callbacks.
@@ -287,7 +289,7 @@ public final class FetchedRecordsController<Record: RowConvertible> {
         }
         
         let initialItems = fetchedItems
-        databaseWriter.write { db in
+        databaseWriter.writeForIssue117 { db in
             let fetchedChangesController = FetchedChangesController(
                 controller: self,
                 fetchAlongside: fetchAlongside,
@@ -299,12 +301,12 @@ public final class FetchedRecordsController<Record: RowConvertible> {
                 fetchedChangesController.checkForChanges(observer)
             }
 
-            let (statement, _) = try! self.request.prepare(db)
-            let observer = FetchedRecordsObserver(checkForChanges)
+            let (statement, _) = try! request.prepare(db)
+            let observer = FetchedRecordsObserver(readInfo: statement.readInfo, checkForChanges: checkForChanges)
             self.observer = observer
             if let initialItems = initialItems {
                 observer.items = initialItems
-                db.addTransactionObserver(observer, forDatabaseEvents: databaseEventFilter(statement.readTables))
+                db.add(transactionObserver: observer)
                 observer.performChangesChecking()
             }
         }
@@ -333,10 +335,10 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     
     
     // The items
-    private var fetchedItems: [Item<Record>]?
+    fileprivate var fetchedItems: [Item<Record>]?
     
     // The record comparator
-    private var isSameItem: (Item<Record>, Item<Record>) -> Bool
+    fileprivate var isSameItem: (Item<Record>, Item<Record>) -> Bool
     
     // The record comparator builder. It helps us supporting types that adopt
     // MutablePersistable: we just have to wait for a database connection, in
@@ -345,10 +347,10 @@ public final class FetchedRecordsController<Record: RowConvertible> {
     private let isSameItemFactory: (Database) -> (Item<Record>, Item<Record>) -> Bool
     
     /// The request
-    private var request: FetchRequest {
+    fileprivate var request: FetchRequest {
         didSet {
             guard let observer = observer else { return }
-            databaseWriter.write { _ in
+            databaseWriter.writeForIssue117 { _ in
                 observer.performChangesChecking()
             }
         }
@@ -363,17 +365,13 @@ extension FetchedRecordsController where Record: TableMapping {
     
     // MARK: - Initialization
     
-    /// Returns a fetched records controller initialized from a SQL query and
+    /// Creates a fetched records controller initialized from a SQL query and
     /// its eventual arguments.
-    ///
-    /// The type of the fetched records must be a subclass of the Record class,
-    /// or adopt both RowConvertible, and Persistable or MutablePersistable
-    /// protocols.
     ///
     ///     let controller = FetchedRecordsController<Wine>(
     ///         dbQueue,
     ///         sql: "SELECT * FROM wines WHERE color = ? ORDER BY name",
-    ///         arguments: [Color.Red],
+    ///         arguments: [Color.red],
     ///         compareRecordsByPrimaryKey: true)
     ///
     /// - parameters:
@@ -391,13 +389,14 @@ extension FetchedRecordsController where Record: TableMapping {
     ///
     ///     - compareRecordsByPrimaryKey: A boolean that tells if two records
     ///         share the same identity if they share the same primay key.
-    public convenience init(_ databaseWriter: DatabaseWriter, sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil, queue: dispatch_queue_t = dispatch_get_main_queue(), compareRecordsByPrimaryKey: Bool) {
+    public convenience init(_ databaseWriter: DatabaseWriter, sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil, queue: DispatchQueue = .main, compareRecordsByPrimaryKey: Bool) {
         self.init(databaseWriter, request: SQLFetchRequest(sql: sql, arguments: arguments, adapter: adapter), queue: queue, compareRecordsByPrimaryKey: compareRecordsByPrimaryKey)
     }
     
-    /// Returns a fetched records controller initialized from a fetch request.
+    /// Creates a fetched records controller initialized from a fetch request.
+    /// from the [Query Interface](https://github.com/groue/GRDB.swift#the-query-interface).
     ///
-    ///     let request = Wine.order(SQLColumn("name"))
+    ///     let request = Wine.order(Column("name"))
     ///     let controller = FetchedRecordsController<Wine>(
     ///         dbQueue,
     ///         request: request,
@@ -416,10 +415,10 @@ extension FetchedRecordsController where Record: TableMapping {
     ///
     ///     - compareRecordsByPrimaryKey: A boolean that tells if two records
     ///         share the same identity if they share the same primay key.
-    public convenience init(_ databaseWriter: DatabaseWriter, request: FetchRequest, queue: dispatch_queue_t = dispatch_get_main_queue(), compareRecordsByPrimaryKey: Bool) {
+    public convenience init(_ databaseWriter: DatabaseWriter, request: FetchRequest, queue: DispatchQueue = .main, compareRecordsByPrimaryKey: Bool) {
         if compareRecordsByPrimaryKey {
             self.init(databaseWriter, request: request, queue: queue, isSameItemFactory: { db in
-                let comparator = try! makePrimaryKeyComparator(db, tableName: Record.databaseTableName())
+                let comparator = try! makePrimaryKeyComparator(db, tableName: Record.databaseTableName)
                 return { comparator($0.row, $1.row) }
             })
         } else {
@@ -442,20 +441,20 @@ private class FetchedChangesController<Record: RowConvertible, T> {
     // called, such unowned reference would have an opportunity to crash.
     weak var controller: FetchedRecordsController<Record>?
     let fetchAlongside: (Database) -> T
-    let recordsWillChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())?
-    let recordsDidChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())?
+    let recordsWillChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())?
+    let recordsDidChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())?
 
     #if os(iOS)
     let isSameItem: (Item<Record>, Item<Record>) -> Bool
-    var tableViewEvent: ((controller: FetchedRecordsController<Record>, record: Record, event: TableViewEvent) -> ())?
+    var tableViewEvent: ((FetchedRecordsController<Record>, Record, TableViewEvent) -> ())?
     
     init(
         controller: FetchedRecordsController<Record>,
-        isSameItem: (Item<Record>, Item<Record>) -> Bool,
-        fetchAlongside: (Database) -> T,
-        recordsWillChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())?,
-        tableViewEvent: ((controller: FetchedRecordsController<Record>, record: Record, event: TableViewEvent) -> ())?,
-        recordsDidChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())?)
+        isSameItem: @escaping (Item<Record>, Item<Record>) -> Bool,
+        fetchAlongside: @escaping (Database) -> T,
+        recordsWillChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())?,
+        tableViewEvent: ((FetchedRecordsController<Record>, Record, TableViewEvent) -> ())?,
+        recordsDidChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())?)
     {
         self.controller = controller
         self.isSameItem = isSameItem
@@ -467,9 +466,9 @@ private class FetchedChangesController<Record: RowConvertible, T> {
     #else
     init(
         controller: FetchedRecordsController<Record>,
-        fetchAlongside: (Database) -> T,
-        recordsWillChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())?,
-        recordsDidChange: ((controller: FetchedRecordsController<Record>, fetchedAlongside: T) -> ())?)
+        fetchAlongside: @escaping (Database) -> T,
+        recordsWillChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())?,
+        recordsDidChange: ((FetchedRecordsController<Record>, _ fetchedAlongside: T) -> ())?)
     {
         self.controller = controller
         self.fetchAlongside = fetchAlongside
@@ -477,15 +476,15 @@ private class FetchedChangesController<Record: RowConvertible, T> {
         self.recordsDidChange = recordsDidChange
     }
     #endif
-
+    
     // Precondition: this method must be called from the database writer's
     // serialized dispatch queue.
-    func checkForChanges(observer: FetchedRecordsObserver<Record>) {
+    func checkForChanges(_ observer: FetchedRecordsObserver<Record>) {
         // Observer invalidated?
         guard observer.isValid else { return }
         
         // Controller alive?
-        guard let request = controller?.request, databaseWriter = controller?.databaseWriter else { return }
+        guard let request = controller?.request, let databaseWriter = controller?.databaseWriter else { return }
         
         // Fetch items.
         //
@@ -508,7 +507,7 @@ private class FetchedChangesController<Record: RowConvertible, T> {
         // fetch: let's immediately dispatch the processing task in our
         // serialized FIFO queue, but have it wait for our fetch to complete,
         // with a semaphore:
-        let semaphore = dispatch_semaphore_create(0)
+        let semaphore = DispatchSemaphore(value: 0)
         var fetchedItems: [Item<Record>]! = nil
         var fetchedAlongside: T! = nil
         
@@ -517,15 +516,15 @@ private class FetchedChangesController<Record: RowConvertible, T> {
             fetchedAlongside = self.fetchAlongside(db)
             
             // Fetch is complete:
-            dispatch_semaphore_signal(semaphore)
+            semaphore.signal()
         }
         
         
         // Process the fetched items
         
-        dispatch_async(observer.queue) { [weak observer] in
+        observer.queue.async { [weak observer] in
             // Wait for the fetch to complete:
-            dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER)
+            _ = semaphore.wait(timeout: .distantFuture)
             assert(fetchedItems != nil)
             assert(fetchedAlongside != nil)
             
@@ -548,14 +547,14 @@ private class FetchedChangesController<Record: RowConvertible, T> {
                     tableViewChanges = changes
                 } else {
                     // Look for a row difference
-                    guard fetchedItems.count != strongObserver.items.count || zip(fetchedItems, strongObserver.items).contains({ (fetchedItem, item) in fetchedItem.row != item.row }) else {
+                    guard fetchedItems.count != strongObserver.items.count || zip(fetchedItems, strongObserver.items).contains(where: { (fetchedItem, item) in fetchedItem.row != item.row }) else {
                         return
                     }
                     tableViewChanges = nil
                 }
             #else
                 // Look for a row difference
-                guard fetchedItems.count != strongObserver.items.count || zip(fetchedItems, strongObserver.items).contains({ (fetchedItem, item) in fetchedItem.row != item.row }) else {
+                guard fetchedItems.count != strongObserver.items.count || zip(fetchedItems, strongObserver.items).contains(where: { (fetchedItem, item) in fetchedItem.row != item.row }) else {
                     return
                 }
             #endif
@@ -563,7 +562,7 @@ private class FetchedChangesController<Record: RowConvertible, T> {
             // Ready for next check
             strongObserver.items = fetchedItems
             
-            dispatch_async(controllerQueue) {
+            controllerQueue.async {
                 // Observer invalidated?
                 guard let strongObserver = observer else { return }
                 guard strongObserver.isValid else { return }
@@ -572,7 +571,7 @@ private class FetchedChangesController<Record: RowConvertible, T> {
                 guard let controller = self.controller else { return }
                 
                 if let recordsWillChange = self.recordsWillChange {
-                    recordsWillChange(controller: controller, fetchedAlongside: fetchedAlongside)
+                    recordsWillChange(controller, fetchedAlongside)
                 }
                 
                 controller.fetchedItems = fetchedItems
@@ -580,13 +579,13 @@ private class FetchedChangesController<Record: RowConvertible, T> {
                 #if os(iOS)
                     if let tableViewEvent = self.tableViewEvent, let tableViewChanges = tableViewChanges {
                         for change in tableViewChanges {
-                            tableViewEvent(controller: controller, record: change.record, event: change.event)
+                            tableViewEvent(controller, change.record, change.event)
                         }
                     }
                 #endif
                 
                 if let recordsDidChange = self.recordsDidChange {
-                    recordsDidChange(controller: controller, fetchedAlongside: fetchedAlongside)
+                    recordsDidChange(controller, fetchedAlongside)
                 }
             }
         }
@@ -598,18 +597,20 @@ private class FetchedChangesController<Record: RowConvertible, T> {
 
 /// FetchedRecordsController adopts TransactionObserverType so that it can
 /// monitor changes to its fetched records.
-private final class FetchedRecordsObserver<Record: RowConvertible> : TransactionObserverType {
+private final class FetchedRecordsObserver<Record: RowConvertible> : TransactionObserver {
     var isValid: Bool
     var needsComputeChanges: Bool
     var items: [Item<Record>]!  // ought to be not nil when observer has started tracking transactions
-    let queue: dispatch_queue_t // protects items
+    let queue: DispatchQueue // protects items
+    let readInfo: SelectStatement.ReadInfo
     var checkForChanges: (FetchedRecordsObserver<Record>) -> ()
     
-    init(_ checkForChanges: (FetchedRecordsObserver<Record>) -> ()) {
+    init(readInfo: SelectStatement.ReadInfo, checkForChanges: @escaping (FetchedRecordsObserver<Record>) -> ()) {
         self.isValid = true
         self.items = nil
         self.needsComputeChanges = false
-        self.queue = dispatch_queue_create("GRDB.FetchedRecordsObserver", DISPATCH_QUEUE_SERIAL)
+        self.queue = DispatchQueue(label: "GRDB.FetchedRecordsObserver")
+        self.readInfo = readInfo
         self.checkForChanges = checkForChanges
     }
     
@@ -617,13 +618,28 @@ private final class FetchedRecordsObserver<Record: RowConvertible> : Transaction
         isValid = false
     }
     
+    func observes(eventsOfKind eventKind: DatabaseEventKind) -> Bool {
+        switch eventKind {
+        case .delete(let tableName):
+            return readInfo[tableName] != nil
+        case .insert(let tableName):
+            return readInfo[tableName] != nil
+        case .update(let tableName, let updatedColumnNames):
+            if let observedColumnNames = readInfo[tableName] {
+                return !updatedColumnNames.isDisjoint(with: observedColumnNames)
+            } else {
+                return false
+            }
+        }
+    }
+    
     #if SQLITE_ENABLE_PREUPDATE_HOOK
     /// Part of the TransactionObserverType protocol
-    func databaseWillChangeWithEvent(event: DatabasePreUpdateEvent) { }
+    func databaseWillChange(with event: DatabasePreUpdateEvent) { }
     #endif
     
     /// Part of the TransactionObserverType protocol
-    func databaseDidChangeWithEvent(event: DatabaseEvent) {
+    func databaseDidChange(with event: DatabaseEvent) {
         needsComputeChanges = true
     }
     
@@ -631,12 +647,12 @@ private final class FetchedRecordsObserver<Record: RowConvertible> : Transaction
     func databaseWillCommit() throws { }
     
     /// Part of the TransactionObserverType protocol
-    func databaseDidRollback(db: Database) {
+    func databaseDidRollback(_ db: Database) {
         needsComputeChanges = false
     }
     
     /// Part of the TransactionObserverType protocol
-    func databaseDidCommit(db: Database) {
+    func databaseDidCommit(_ db: Database) {
         // The databaseDidCommit callback is called in the database writer
         // dispatch queue, which is serialized: it is guaranteed to process the
         // last database transaction.
@@ -655,16 +671,16 @@ private final class FetchedRecordsObserver<Record: RowConvertible> : Transaction
     }
 }
 
-private func databaseEventFilter(observedTables: [String: Set<String>]) -> (DatabaseEventKind) -> Bool {
+private func databaseEventFilter(readInfo: SelectStatement.ReadInfo) -> (DatabaseEventKind) -> Bool {
     return { kind in
         switch kind {
-        case .Delete(let tableName):
-            return observedTables[tableName] != nil
-        case .Insert(let tableName):
-            return observedTables[tableName] != nil
-        case .Update(let tableName, let updatedColumnNames):
-            if let observedColumnNames = observedTables[tableName] {
-                return !updatedColumnNames.isDisjointWith(observedColumnNames)
+        case .delete(let tableName):
+            return readInfo[tableName] != nil
+        case .insert(let tableName):
+            return readInfo[tableName] != nil
+        case .update(let tableName, let updatedColumnNames):
+            if let observedColumnNames = readInfo[tableName] {
+                return !updatedColumnNames.isDisjoint(with: observedColumnNames)
             } else {
                 return false
             }
@@ -686,11 +702,11 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
         ///
         ///     If indexPath does not describe a valid index path in the fetched
         ///     records, a fatal error is raised.
-        public func recordAtIndexPath(indexPath: NSIndexPath) -> Record {
+        public func record(at indexPath: IndexPath) -> Record {
             guard let fetchedItems = fetchedItems else {
                 fatalError("performFetch() has not been called.")
             }
-            return fetchedItems[indexPath.indexAtPosition(1)].record
+            return fetchedItems[indexPath.row].record
         }
         
         
@@ -712,35 +728,35 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
         ///
         /// - returns: The index path of *record* in the fetched records, or nil
         ///   if record could not be found.
-        public func indexPathForRecord(record: Record) -> NSIndexPath? {
-            let item = Item<Record>(Row(record.persistentDictionary))
-            guard let fetchedItems = fetchedItems, let index = fetchedItems.indexOf({ isSameItem($0, item) }) else {
+        public func indexPath(for record: Record) -> IndexPath? {
+            let item = Item<Record>(row: Row(record.persistentDictionary))
+            guard let fetchedItems = fetchedItems, let index = fetchedItems.index(where: { isSameItem($0, item) }) else {
                 return nil
             }
-            return NSIndexPath(forRow: index, inSection: 0)
+            return IndexPath(row: index, section: 0)
         }
     }
     
     extension FetchedChangesController {
         
-        private func computeTableViewChanges(from s: [Item<Record>], to t: [Item<Record>]) -> [TableViewChange<Record>] {
+        fileprivate func computeTableViewChanges(from s: [Item<Record>], to t: [Item<Record>]) -> [TableViewChange<Record>] {
             let m = s.count
             let n = t.count
             
             // Fill first row and column of insertions and deletions.
             
-            var d: [[[TableViewChange<Record>]]] = Array(count: m + 1, repeatedValue: Array(count: n + 1, repeatedValue: []))
+            var d: [[[TableViewChange<Record>]]] = Array(repeating: Array(repeating: [], count: n + 1), count: m + 1)
             
             var changes = [TableViewChange<Record>]()
-            for (row, item) in s.enumerate() {
-                let deletion = TableViewChange.Deletion(item: item, indexPath: NSIndexPath(forRow: row, inSection: 0))
+            for (row, item) in s.enumerated() {
+                let deletion = TableViewChange.deletion(item: item, indexPath: IndexPath(row: row, section: 0))
                 changes.append(deletion)
                 d[row + 1][0] = changes
             }
             
             changes.removeAll()
-            for (col, item) in t.enumerate() {
-                let insertion = TableViewChange.Insertion(item: item, indexPath: NSIndexPath(forRow: col, inSection: 0))
+            for (col, item) in t.enumerated() {
+                let insertion = TableViewChange.insertion(item: item, indexPath: IndexPath(row: col, section: 0))
                 changes.append(insertion)
                 d[0][col + 1] = changes
             }
@@ -763,16 +779,16 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
                         // Record operation.
                         let minimumCount = min(del.count, ins.count, sub.count)
                         if del.count == minimumCount {
-                            let deletion = TableViewChange.Deletion(item: s[sx], indexPath: NSIndexPath(forRow: sx, inSection: 0))
+                            let deletion = TableViewChange.deletion(item: s[sx], indexPath: IndexPath(row: sx, section: 0))
                             del.append(deletion)
                             d[sx+1][tx+1] = del
                         } else if ins.count == minimumCount {
-                            let insertion = TableViewChange.Insertion(item: t[tx], indexPath: NSIndexPath(forRow: tx, inSection: 0))
+                            let insertion = TableViewChange.insertion(item: t[tx], indexPath: IndexPath(row: tx, section: 0))
                             ins.append(insertion)
                             d[sx+1][tx+1] = ins
                         } else {
-                            let deletion = TableViewChange.Deletion(item: s[sx], indexPath: NSIndexPath(forRow: sx, inSection: 0))
-                            let insertion = TableViewChange.Insertion(item: t[tx], indexPath: NSIndexPath(forRow: tx, inSection: 0))
+                            let deletion = TableViewChange.deletion(item: s[sx], indexPath: IndexPath(row: sx, section: 0))
+                            let insertion = TableViewChange.insertion(item: t[tx], indexPath: IndexPath(row: tx, section: 0))
                             sub.append(deletion)
                             sub.append(insertion)
                             d[sx+1][tx+1] = sub
@@ -781,21 +797,21 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
                 }
             }
             
-            /// Returns an array where deletion/insertion pairs of the same element are replaced by `.Move` change.
-            func standardizeChanges(changes: [TableViewChange<Record>]) -> [TableViewChange<Record>] {
+            /// Returns an array where deletion/insertion pairs of the same element are replaced by `.move` change.
+            func standardize(changes: [TableViewChange<Record>]) -> [TableViewChange<Record>] {
                 
-                /// Returns a potential .Move or .Update if *change* has a matching change in *changes*:
+                /// Returns a potential .move or .update if *change* has a matching change in *changes*:
                 /// If *change* is a deletion or an insertion, and there is a matching inverse
-                /// insertion/deletion with the same value in *changes*, a corresponding .Move or .Update is returned.
+                /// insertion/deletion with the same value in *changes*, a corresponding .move or .update is returned.
                 /// As a convenience, the index of the matched change is returned as well.
-                func mergedChange(change: TableViewChange<Record>, inChanges changes: [TableViewChange<Record>]) -> (mergedChange: TableViewChange<Record>, mergedIndex: Int)? {
+                func merge(change: TableViewChange<Record>, in changes: [TableViewChange<Record>]) -> (mergedChange: TableViewChange<Record>, mergedIndex: Int)? {
                     
                     /// Returns the changes between two rows: a dictionary [key: oldValue]
                     /// Precondition: both rows have the same columns
                     func changedValues(from oldRow: Row, to newRow: Row) -> [String: DatabaseValue] {
                         var changedValues: [String: DatabaseValue] = [:]
                         for (column, newValue) in newRow {
-                            let oldValue = oldRow.databaseValue(named: column)
+                            let oldValue: DatabaseValue? = oldRow.value(named: column)
                             if newValue != oldValue {
                                 changedValues[column] = oldValue
                             }
@@ -804,30 +820,30 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
                     }
                     
                     switch change {
-                    case .Insertion(let newItem, let newIndexPath):
+                    case .insertion(let newItem, let newIndexPath):
                         // Look for a matching deletion
-                        for (index, otherChange) in changes.enumerate() {
-                            guard case .Deletion(let oldItem, let oldIndexPath) = otherChange else { continue }
+                        for (index, otherChange) in changes.enumerated() {
+                            guard case .deletion(let oldItem, let oldIndexPath) = otherChange else { continue }
                             guard isSameItem(oldItem, newItem) else { continue }
                             let rowChanges = changedValues(from: oldItem.row, to: newItem.row)
                             if oldIndexPath == newIndexPath {
-                                return (TableViewChange.Update(item: newItem, indexPath: oldIndexPath, changes: rowChanges), index)
+                                return (TableViewChange.update(item: newItem, indexPath: oldIndexPath, changes: rowChanges), index)
                             } else {
-                                return (TableViewChange.Move(item: newItem, indexPath: oldIndexPath, newIndexPath: newIndexPath, changes: rowChanges), index)
+                                return (TableViewChange.move(item: newItem, indexPath: oldIndexPath, newIndexPath: newIndexPath, changes: rowChanges), index)
                             }
                         }
                         return nil
                         
-                    case .Deletion(let oldItem, let oldIndexPath):
+                    case .deletion(let oldItem, let oldIndexPath):
                         // Look for a matching insertion
-                        for (index, otherChange) in changes.enumerate() {
-                            guard case .Insertion(let newItem, let newIndexPath) = otherChange else { continue }
+                        for (index, otherChange) in changes.enumerated() {
+                            guard case .insertion(let newItem, let newIndexPath) = otherChange else { continue }
                             guard isSameItem(oldItem, newItem) else { continue }
                             let rowChanges = changedValues(from: oldItem.row, to: newItem.row)
                             if oldIndexPath == newIndexPath {
-                                return (TableViewChange.Update(item: newItem, indexPath: oldIndexPath, changes: rowChanges), index)
+                                return (TableViewChange.update(item: newItem, indexPath: oldIndexPath, changes: rowChanges), index)
                             } else {
-                                return (TableViewChange.Move(item: newItem, indexPath: oldIndexPath, newIndexPath: newIndexPath, changes: rowChanges), index)
+                                return (TableViewChange.move(item: newItem, indexPath: oldIndexPath, newIndexPath: newIndexPath, changes: rowChanges), index)
                             }
                         }
                         return nil
@@ -841,10 +857,10 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
                 var mergedChanges: [TableViewChange<Record>] = []
                 var updateChanges: [TableViewChange<Record>] = []
                 for change in changes {
-                    if let (mergedChange, mergedIndex) = mergedChange(change, inChanges: mergedChanges) {
-                        mergedChanges.removeAtIndex(mergedIndex)
+                    if let (mergedChange, mergedIndex) = merge(change: change, in: mergedChanges) {
+                        mergedChanges.remove(at: mergedIndex)
                         switch mergedChange {
-                        case .Update:
+                        case .update:
                             updateChanges.append(mergedChange)
                         default:
                             mergedChanges.append(mergedChange)
@@ -856,41 +872,41 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
                 return mergedChanges + updateChanges
             }
             
-            return standardizeChanges(d[m][n])
+            return standardize(changes: d[m][n])
         }
     }
     
     private enum TableViewChange<T: RowConvertible> {
-        case Insertion(item: Item<T>, indexPath: NSIndexPath)
-        case Deletion(item: Item<T>, indexPath: NSIndexPath)
-        case Move(item: Item<T>, indexPath: NSIndexPath, newIndexPath: NSIndexPath, changes: [String: DatabaseValue])
-        case Update(item: Item<T>, indexPath: NSIndexPath, changes: [String: DatabaseValue])
+        case insertion(item: Item<T>, indexPath: IndexPath)
+        case deletion(item: Item<T>, indexPath: IndexPath)
+        case move(item: Item<T>, indexPath: IndexPath, newIndexPath: IndexPath, changes: [String: DatabaseValue])
+        case update(item: Item<T>, indexPath: IndexPath, changes: [String: DatabaseValue])
     }
     
     extension TableViewChange {
         var record: T {
             switch self {
-            case .Insertion(item: let item, indexPath: _):
+            case .insertion(item: let item, indexPath: _):
                 return item.record
-            case .Deletion(item: let item, indexPath: _):
+            case .deletion(item: let item, indexPath: _):
                 return item.record
-            case .Move(item: let item, indexPath: _, newIndexPath: _, changes: _):
+            case .move(item: let item, indexPath: _, newIndexPath: _, changes: _):
                 return item.record
-            case .Update(item: let item, indexPath: _, changes: _):
+            case .update(item: let item, indexPath: _, changes: _):
                 return item.record
             }
         }
         
         var event: TableViewEvent {
             switch self {
-            case .Insertion(item: _, indexPath: let indexPath):
-                return .Insertion(indexPath: indexPath)
-            case .Deletion(item: _, indexPath: let indexPath):
-                return .Deletion(indexPath: indexPath)
-            case .Move(item: _, indexPath: let indexPath, newIndexPath: let newIndexPath, changes: let changes):
-                return .Move(indexPath: indexPath, newIndexPath: newIndexPath, changes: changes)
-            case .Update(item: _, indexPath: let indexPath, changes: let changes):
-                return .Update(indexPath: indexPath, changes: changes)
+            case .insertion(item: _, indexPath: let indexPath):
+                return .insertion(indexPath: indexPath)
+            case .deletion(item: _, indexPath: let indexPath):
+                return .deletion(indexPath: indexPath)
+            case .move(item: _, indexPath: let indexPath, newIndexPath: let newIndexPath, changes: let changes):
+                return .move(indexPath: indexPath, newIndexPath: newIndexPath, changes: changes)
+            case .update(item: _, indexPath: let indexPath, changes: let changes):
+                return .update(indexPath: indexPath, changes: changes)
             }
         }
     }
@@ -898,16 +914,16 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
     extension TableViewChange: CustomStringConvertible {
         var description: String {
             switch self {
-            case .Insertion(let item, let indexPath):
+            case .insertion(let item, let indexPath):
                 return "Insert \(item) at \(indexPath)"
                 
-            case .Deletion(let item, let indexPath):
+            case .deletion(let item, let indexPath):
                 return "Delete \(item) from \(indexPath)"
                 
-            case .Move(let item, let indexPath, let newIndexPath, changes: let changes):
+            case .move(let item, let indexPath, let newIndexPath, changes: let changes):
                 return "Move \(item) from \(indexPath) to \(newIndexPath) with changes: \(changes)"
                 
-            case .Update(let item, let indexPath, let changes):
+            case .update(let item, let indexPath, let changes):
                 return "Update \(item) at \(indexPath) with changes: \(changes)"
             }
         }
@@ -920,20 +936,20 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
     public enum TableViewEvent {
         
         /// An insertion event, at given indexPath.
-        case Insertion(indexPath: NSIndexPath)
+        case insertion(indexPath: IndexPath)
         
         /// A deletion event, at given indexPath.
-        case Deletion(indexPath: NSIndexPath)
+        case deletion(indexPath: IndexPath)
         
         /// A move event, from indexPath to newIndexPath. The *changes* are a
         /// dictionary whose keys are column names, and values the old values that
         /// have been changed.
-        case Move(indexPath: NSIndexPath, newIndexPath: NSIndexPath, changes: [String: DatabaseValue])
+        case move(indexPath: IndexPath, newIndexPath: IndexPath, changes: [String: DatabaseValue])
         
         /// An update event, at given indexPath. The *changes* are a dictionary
         /// whose keys are column names, and values the old values that have
         /// been changed.
-        case Update(indexPath: NSIndexPath, changes: [String: DatabaseValue])
+        case update(indexPath: IndexPath, changes: [String: DatabaseValue])
     }
     
     extension TableViewEvent: CustomStringConvertible {
@@ -941,16 +957,16 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
         /// A textual representation of `self`.
         public var description: String {
             switch self {
-            case .Insertion(let indexPath):
+            case .insertion(let indexPath):
                 return "Insertion at \(indexPath)"
                 
-            case .Deletion(let indexPath):
+            case .deletion(let indexPath):
                 return "Deletion from \(indexPath)"
                 
-            case .Move(let indexPath, let newIndexPath, changes: let changes):
+            case .move(let indexPath, let newIndexPath, changes: let changes):
                 return "Move from \(indexPath) to \(newIndexPath) with changes: \(changes)"
                 
-            case .Update(let indexPath, let changes):
+            case .update(let indexPath, let changes):
                 return "Update at \(indexPath) with changes: \(changes)"
             }
         }
@@ -958,7 +974,7 @@ private func databaseEventFilter(observedTables: [String: Set<String>]) -> (Data
     
     /// A section given by a FetchedRecordsController.
     public struct FetchedRecordsSectionInfo<Record: RowConvertible> {
-        private let controller: FetchedRecordsController<Record>
+        fileprivate let controller: FetchedRecordsController<Record>
         
         /// The number of records (rows) in the section.
         public var numberOfRecords: Int {
@@ -982,12 +998,12 @@ private final class Item<T: RowConvertible> : RowConvertible, Equatable {
     
     // Records are lazily loaded
     lazy var record: T = {
-        var record = T(self.row)
+        var record = T(row: self.row)
         record.awakeFromFetch(row: self.row)
         return record
     }()
     
-    init(_ row: Row) {
+    init(row: Row) {
         self.row = row.copy()
     }
 }
@@ -1007,10 +1023,10 @@ private func ==<T>(lhs: Item<T>, rhs: Item<T>) -> Bool {
 ///         primaryKey(row) // ["id": 1]
 ///
 /// - throws: A DatabaseError if table does not exist.
-func makePrimaryKeyFunction(db: Database, tableName: String) throws -> (Row) -> [String: DatabaseValue] {
+func makePrimaryKeyFunction(_ db: Database, tableName: String) throws -> (Row) -> [String: DatabaseValue] {
     let columns = try db.primaryKey(tableName)?.columns ?? []
     return { row in
-        return Dictionary<String, DatabaseValue>(keys: columns) { row.databaseValue(named: $0)! }
+        return Dictionary<String, DatabaseValue>(keys: columns) { row.value(named: $0) }
     }
 }
 
@@ -1030,12 +1046,12 @@ func makePrimaryKeyFunction(db: Database, tableName: String) throws -> (Row) -> 
 ///     }
 ///
 /// - throws: A DatabaseError if table does not exist.
-func makePrimaryKeyComparator(db: Database, tableName: String) throws -> (Row, Row) -> Bool {
+func makePrimaryKeyComparator(_ db: Database, tableName: String) throws -> (Row, Row) -> Bool {
     let primaryKey = try makePrimaryKeyFunction(db, tableName: tableName)
     return { (lhs, rhs) in
         let (lhs, rhs) = (primaryKey(lhs), primaryKey(rhs))
-        guard lhs.contains({ !$1.isNull }) else { return false }
-        guard rhs.contains({ !$1.isNull }) else { return false }
+        guard lhs.contains(where: { !$1.isNull }) else { return false }
+        guard rhs.contains(where: { !$1.isNull }) else { return false }
         return lhs == rhs
     }
 }

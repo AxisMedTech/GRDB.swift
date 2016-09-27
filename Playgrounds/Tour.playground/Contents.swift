@@ -39,7 +39,7 @@ try dbQueue.inDatabase { db in
 
 //: Fetch database rows and values
 
-try dbQueue.inDatabase { db in
+dbQueue.inDatabase { db in
     for row in Row.fetchAll(db, "SELECT * FROM pointOfInterests") {
         let title: String = row.value(named: "title")
         let favorite: Bool = row.value(named: "favorite")
@@ -65,7 +65,7 @@ struct PointOfInterest {
 
 // Adopt RowConvertible
 extension PointOfInterest : RowConvertible {
-    init(_ row: Row) {
+    init(row: Row) {
         id = row.value(named: "id")
         title = row.value(named: "title")
         favorite = row.value(named: "favorite")
@@ -77,9 +77,7 @@ extension PointOfInterest : RowConvertible {
 
 // Adopt TableMapping
 extension PointOfInterest : TableMapping {
-    static func databaseTableName() -> String {
-        return "pointOfInterests"
-    }
+    static let databaseTableName = "pointOfInterests"
 }
 
 // Adopt MutablePersistable
@@ -94,7 +92,7 @@ extension PointOfInterest : MutablePersistable {
         ]
     }
     
-    mutating func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    mutating func didInsert(with rowID: Int64, for column: String?) {
         id = rowID
     }
 }
@@ -118,8 +116,8 @@ try dbQueue.inDatabase { db in
     
     //: Avoid SQL with the query interface:
     
-    let title = SQLColumn("title")
-    let favorite = SQLColumn("favorite")
+    let title = Column("title")
+    let favorite = Column("favorite")
     
     berlin = PointOfInterest.filter(title == "Berlin").fetchOne(db)!   // PointOfInterest
     let paris = PointOfInterest.fetchOne(db, key: 1)                   // PointOfInterest?

@@ -1,3 +1,5 @@
+import Foundation
+
 #if !USING_BUILTIN_SQLITE
     #if os(OSX)
         import SQLiteMacOSX
@@ -6,6 +8,12 @@
             import SQLiteiPhoneSimulator
         #else
             import SQLiteiPhoneOS
+        #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
         #endif
     #endif
 #endif
@@ -36,18 +44,18 @@ public final class DatabasePool {
         // Database Store
         store = try DatabaseStore(path: path, attributes: configuration.fileAttributes)
         
-        // Shared database schema cache
-        let databaseSchemaCache = SharedDatabaseSchemaCache()
+        // Writer and readers share the same database schema cache
+        let sharedSchemaCache = SharedDatabaseSchemaCache()
         
         // Writer
         writer = try SerializedDatabase(
             path: path,
             configuration: configuration,
-            schemaCache: databaseSchemaCache)
+            schemaCache: sharedSchemaCache)
         
         // Activate WAL Mode unless readonly
         if !configuration.readonly {
-            try writer.performSync { db in
+            try writer.sync { db in
                 let journalMode = String.fetchOne(db, "PRAGMA journal_mode = WAL")
                 guard journalMode == "wal" else {
                     throw DatabaseError(message: "could not activate WAL Mode at path: \(path)")
@@ -56,31 +64,40 @@ public final class DatabasePool {
                 // https://www.sqlite.org/pragma.html#pragma_synchronous
                 // > Many applications choose NORMAL when in WAL mode
                 try db.execute("PRAGMA synchronous = NORMAL")
+                
+                if !FileManager.default.fileExists(atPath: path + "-wal") {
+                    // Create the -wal file if it does not exist yet. This
+                    // avoids an SQLITE_CANTOPEN (14) error whenever a user
+                    // opens a pool to an existing non-WAL database, and
+                    // attempts to read from it.
+                    // See https://github.com/groue/GRDB.swift/issues/102
+                    try db.execute("CREATE TABLE grdb_issue_102 (id INTEGER PRIMARY KEY); DROP TABLE grdb_issue_102;")
+                }
             }
         }
         
         // Readers
         readerConfig = configuration
         readerConfig.readonly = true
-        readerConfig.defaultTransactionKind = .Deferred // Make it the default. Other transaction kinds are forbidden by SQLite in read-only connections.
+        readerConfig.defaultTransactionKind = .deferred // Make it the default. Other transaction kinds are forbidden by SQLite in read-only connections.
         
         readerPool = Pool<SerializedDatabase>(maximumCount: configuration.maximumReaderCount)
         readerPool.makeElement = { [unowned self] in
-            let serializedDatabase = try! SerializedDatabase(
+            let reader = try! SerializedDatabase(
                 path: path,
                 configuration: self.readerConfig,
-                schemaCache: databaseSchemaCache)
+                schemaCache: sharedSchemaCache)
             
-            serializedDatabase.performSync { db in
+            reader.sync { db in
                 for function in self.functions {
-                    db.addFunction(function)
+                    db.add(function: function)
                 }
                 for collation in self.collations {
-                    db.addCollation(collation)
+                    db.add(collation: collation)
                 }
             }
             
-            return serializedDatabase
+            return reader
         }
     }
     
@@ -90,7 +107,7 @@ public final class DatabasePool {
         //
         // https://developer.apple.com/library/mac/releasenotes/Foundation/RN-Foundation/index.html#10_11Error
         // Explicit unregistration is required before iOS 9 and OS X 10.11.
-        NSNotificationCenter.defaultCenter().removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
     }
     #endif
     
@@ -111,8 +128,8 @@ public final class DatabasePool {
     /// more information.
     ///
     /// - parameter kind: The checkpoint mode (default passive)
-    public func checkpoint(kind: CheckpointMode = .Passive) throws {
-        try writer.performSync { db in
+    public func checkpoint(_ kind: Database.CheckpointMode = .passive) throws {
+        try writer.sync { db in
             // TODO: read https://www.sqlite.org/c3ref/wal_checkpoint_v2.html and
             // check whether we need a busy handler on writer and/or readers
             // when kind is not .Passive.
@@ -133,12 +150,12 @@ public final class DatabasePool {
     /// See also setupMemoryManagement(application:)
     public func releaseMemory() {
         // TODO: test that this method blocks the current thread until all database accesses are completed.
-        writer.performSync { db in
+        writer.sync { db in
             db.releaseMemory()
         }
         
         readerPool.forEach { reader in
-            reader.performSync { db in
+            reader.sync { db in
                 db.releaseMemory()
             }
         }
@@ -155,37 +172,37 @@ public final class DatabasePool {
     /// - param application: The UIApplication that will start a background
     ///   task to let the database pool release its memory when the application
     ///   enters background.
-    public func setupMemoryManagement(application application: UIApplication) {
+    public func setupMemoryManagement(in application: UIApplication) {
         self.application = application
-        let center = NSNotificationCenter.defaultCenter()
-        center.addObserver(self, selector: #selector(DatabasePool.applicationDidReceiveMemoryWarning(_:)), name: UIApplicationDidReceiveMemoryWarningNotification, object: nil)
-        center.addObserver(self, selector: #selector(DatabasePool.applicationDidEnterBackground(_:)), name: UIApplicationDidEnterBackgroundNotification, object: nil)
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(DatabasePool.applicationDidReceiveMemoryWarning(_:)), name: .UIApplicationDidReceiveMemoryWarning, object: nil)
+        center.addObserver(self, selector: #selector(DatabasePool.applicationDidEnterBackground(_:)), name: .UIApplicationDidEnterBackground, object: nil)
     }
     
     private var application: UIApplication!
     
-    @objc private func applicationDidEnterBackground(notification: NSNotification) {
+    @objc private func applicationDidEnterBackground(_ notification: NSNotification) {
         guard let application = application else {
             return
         }
         
         var task: UIBackgroundTaskIdentifier! = nil
-        task = application.beginBackgroundTaskWithExpirationHandler(nil)
+        task = application.beginBackgroundTask(expirationHandler: nil)
         
         if task == UIBackgroundTaskInvalid {
             // Perform releaseMemory() synchronously.
             releaseMemory()
         } else {
             // Perform releaseMemory() asynchronously.
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
+            DispatchQueue.global().async {
                 self.releaseMemory()
                 application.endBackgroundTask(task)
             }
         }
     }
     
-    @objc private func applicationDidReceiveMemoryWarning(notification: NSNotification) {
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
+    @objc private func applicationDidReceiveMemoryWarning(_ notification: NSNotification) {
+        DispatchQueue.global().async {
             self.releaseMemory()
         }
     }
@@ -195,20 +212,12 @@ public final class DatabasePool {
     // MARK: - Not public
     
     let store: DatabaseStore    // Not private for tests that require syncing with the store
-    private let writer: SerializedDatabase
-    private var readerConfig: Configuration
-    private let readerPool: Pool<SerializedDatabase>
+    fileprivate let writer: SerializedDatabase
+    fileprivate var readerConfig: Configuration
+    fileprivate let readerPool: Pool<SerializedDatabase>
     
-    private var functions = Set<DatabaseFunction>()
-    private var collations = Set<DatabaseCollation>()
-}
-
-/// The available [checkpoint modes](https://www.sqlite.org/c3ref/wal_checkpoint_v2.html).
-public enum CheckpointMode: Int32 {
-    case Passive = 0    // SQLITE_CHECKPOINT_PASSIVE
-    case Full = 1       // SQLITE_CHECKPOINT_FULL
-    case Restart = 2    // SQLITE_CHECKPOINT_RESTART
-    case Truncate = 3   // SQLITE_CHECKPOINT_TRUNCATE
+    fileprivate var functions = Set<DatabaseFunction>()
+    fileprivate var collations = Set<DatabaseCollation>()
 }
 
 
@@ -219,12 +228,12 @@ public enum CheckpointMode: Int32 {
     extension DatabasePool {
         
         /// Changes the passphrase of an encrypted database
-        public func changePassphrase(passphrase: String) throws {
+        public func change(passphrase: String) throws {
             try readerPool.clear {
-                try self.writer.performSync { db in
-                    try db.changePassphrase(passphrase)
+                try writer.sync { db in
+                    try db.change(passphrase: passphrase)
                 }
-                self.readerConfig.passphrase = passphrase
+                readerConfig.passphrase = passphrase
             }
         }
     }
@@ -264,15 +273,15 @@ extension DatabasePool : DatabaseReader {
     ///
     /// - parameter block: A block that accesses the database.
     /// - throws: The error thrown by the block.
-    public func read<T>(block: (db: Database) throws -> T) rethrows -> T {
+    public func read<T>(_ block: (Database) throws -> T) rethrows -> T {
         // The block isolation comes from the DEFERRED transaction.
         // See DatabasePoolTests.testReadMethodIsolationOfBlock().
         return try readerPool.get { reader in
-            try reader.performSync { db in
+            try reader.sync { db in
                 var result: T? = nil
-                try db.inTransaction(.Deferred) {
-                    result = try block(db: db)
-                    return .Commit
+                try db.inTransaction(.deferred) {
+                    result = try block(db)
+                    return .commit
                 }
                 return result!
             }
@@ -299,10 +308,10 @@ extension DatabasePool : DatabaseReader {
     ///
     /// - parameter block: A block that accesses the database.
     /// - throws: The error thrown by the block.
-    public func nonIsolatedRead<T>(block: (db: Database) throws -> T) rethrows -> T {
+    public func nonIsolatedRead<T>(_ block: (Database) throws -> T) rethrows -> T {
         return try readerPool.get { reader in
-            try reader.performSync { db in
-                try block(db: db)
+            try reader.sync { db in
+                try block(db)
             }
         }
     }
@@ -319,22 +328,21 @@ extension DatabasePool : DatabaseReader {
     ///         }
     ///         return int + 1
     ///     }
-    ///     dbPool.addFunction(fn)
+    ///     dbPool.add(function: fn)
     ///     dbPool.read { db in
     ///         Int.fetchOne(db, "SELECT succ(1)") // 2
     ///     }
-    public func addFunction(function: DatabaseFunction) {
-        functions.remove(function)
-        functions.insert(function)
-        writer.performSync { db in db.addFunction(function) }
-        readerPool.forEach { $0.performSync { db in db.addFunction(function) } }
+    public func add(function: DatabaseFunction) {
+        functions.update(with: function)
+        writer.sync { db in db.add(function: function) }
+        readerPool.forEach { $0.sync { db in db.add(function: function) } }
     }
     
     /// Remove an SQL function.
-    public func removeFunction(function: DatabaseFunction) {
+    public func remove(function: DatabaseFunction) {
         functions.remove(function)
-        writer.performSync { db in db.removeFunction(function) }
-        readerPool.forEach { $0.performSync { db in db.removeFunction(function) } }
+        writer.sync { db in db.remove(function: function) }
+        readerPool.forEach { $0.sync { db in db.remove(function: function) } }
     }
     
     
@@ -345,22 +353,21 @@ extension DatabasePool : DatabaseReader {
     ///     let collation = DatabaseCollation("localized_standard") { (string1, string2) in
     ///         return (string1 as NSString).localizedStandardCompare(string2)
     ///     }
-    ///     dbPool.addCollation(collation)
+    ///     dbPool.add(collation: collation)
     ///     dbPool.write { db in
     ///         try db.execute("CREATE TABLE files (name TEXT COLLATE LOCALIZED_STANDARD")
     ///     }
-    public func addCollation(collation: DatabaseCollation) {
-        collations.remove(collation)
-        collations.insert(collation)
-        writer.performSync { db in db.addCollation(collation) }
-        readerPool.forEach { $0.performSync { db in db.addCollation(collation) } }
+    public func add(collation: DatabaseCollation) {
+        collations.update(with: collation)
+        writer.sync { db in db.add(collation: collation) }
+        readerPool.forEach { $0.sync { db in db.add(collation: collation) } }
     }
     
     /// Remove a collation.
-    public func removeCollation(collation: DatabaseCollation) {
+    public func remove(collation: DatabaseCollation) {
         collations.remove(collation)
-        writer.performSync { db in db.removeCollation(collation) }
-        readerPool.forEach { $0.performSync { db in db.removeCollation(collation) } }
+        writer.sync { db in db.remove(collation: collation) }
+        readerPool.forEach { $0.sync { db in db.remove(collation: collation) } }
     }
 }
 
@@ -383,8 +390,8 @@ extension DatabasePool : DatabaseWriter {
     ///
     /// - parameter block: A block that accesses the database.
     /// - throws: The error thrown by the block.
-    public func write<T>(block: (db: Database) throws -> T) rethrows -> T {
-        return try writer.performSync(block)
+    public func write<T>(_ block: (Database) throws -> T) rethrows -> T {
+        return try writer.sync(block)
     }
     
     /// Synchronously executes a block in a protected dispatch queue, wrapped
@@ -395,7 +402,7 @@ extension DatabasePool : DatabaseWriter {
     ///
     ///     try dbPool.writeInTransaction { db in
     ///         db.execute(...)
-    ///         return .Commit
+    ///         return .commit
     ///     }
     ///
     /// This method is *not* reentrant.
@@ -403,15 +410,15 @@ extension DatabasePool : DatabaseWriter {
     /// - parameters:
     ///     - kind: The transaction type (default nil). If nil, the transaction
     ///       type is configuration.defaultTransactionKind, which itself
-    ///       defaults to .Immediate. See https://www.sqlite.org/lang_transaction.html
+    ///       defaults to .immediate. See https://www.sqlite.org/lang_transaction.html
     ///       for more information.
     ///     - block: A block that executes SQL statements and return either
-    ///       .Commit or .Rollback.
+    ///       .commit or .rollback.
     /// - throws: The error thrown by the block.
-    public func writeInTransaction(kind: TransactionKind? = nil, _ block: (db: Database) throws -> TransactionCompletion) throws {
-        try writer.performSync { db in
+    public func writeInTransaction(_ kind: Database.TransactionKind? = nil, _ block: (Database) throws -> Database.TransactionCompletion) throws {
+        try writer.sync { db in
             try db.inTransaction(kind) {
-                try block(db: db)
+                try block(db)
             }
         }
     }
@@ -442,21 +449,21 @@ extension DatabasePool : DatabaseWriter {
     ///
     /// The database pool releases the writing dispatch queue early, before the
     /// block has finished.
-    public func readFromWrite(block: (db: Database) -> Void) {
+    public func readFromWrite(_ block: @escaping (Database) -> Void) {
         writer.preconditionValidQueue()
         
-        let semaphore = dispatch_semaphore_create(0)
-        self.readerPool.get { reader in
-            reader.performAsync { db in
+        let semaphore = DispatchSemaphore(value: 0)
+        readerPool.get { reader in
+            reader.async { db in
                 // Assume COMMIT DEFERRED TRANSACTION does not throw error.
-                try! db.inTransaction(.Deferred) {
+                try! db.inTransaction(.deferred) {
                     // Now we're isolated: release the writing queue
-                    dispatch_semaphore_signal(semaphore)
-                    block(db: db)
-                    return .Commit
+                    semaphore.signal()
+                    block(db)
+                    return .commit
                 }
             }
         }
-        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER)
+        _ = semaphore.wait(timeout: .distantFuture)
     }
 }

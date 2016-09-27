@@ -24,7 +24,7 @@ public final class DatabaseQueue {
         serializedDatabase = try SerializedDatabase(
             path: path,
             configuration: configuration,
-            schemaCache: DatabaseSchemaCache())
+            schemaCache: SimpleDatabaseSchemaCache())
     }
     
     /// Opens an in-memory SQLite database.
@@ -39,7 +39,7 @@ public final class DatabaseQueue {
         serializedDatabase = try! SerializedDatabase(
             path: ":memory:",
             configuration: configuration,
-            schemaCache: DatabaseSchemaCache())
+            schemaCache: SimpleDatabaseSchemaCache())
     }
     
     #if os(iOS)
@@ -48,7 +48,7 @@ public final class DatabaseQueue {
         //
         // https://developer.apple.com/library/mac/releasenotes/Foundation/RN-Foundation/index.html#10_11Error
         // Explicit unregistration is required before iOS 9 and OS X 10.11.
-        NSNotificationCenter.defaultCenter().removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
     }
     #endif
     
@@ -79,8 +79,8 @@ public final class DatabaseQueue {
     ///
     /// - parameter block: A block that accesses the database.
     /// - throws: The error thrown by the block.
-    public func inDatabase<T>(block: (db: Database) throws -> T) rethrows -> T {
-        return try serializedDatabase.performSync(block)
+    public func inDatabase<T>(_ block: (Database) throws -> T) rethrows -> T {
+        return try serializedDatabase.sync(block)
     }
     
     /// Synchronously executes a block in a protected dispatch queue, wrapped
@@ -91,7 +91,7 @@ public final class DatabaseQueue {
     ///
     ///     try dbQueue.inTransaction { db in
     ///         db.execute(...)
-    ///         return .Commit
+    ///         return .commit
     ///     }
     ///
     /// This method is *not* reentrant.
@@ -99,15 +99,15 @@ public final class DatabaseQueue {
     /// - parameters:
     ///     - kind: The transaction type (default nil). If nil, the transaction
     ///       type is configuration.defaultTransactionKind, which itself
-    ///       defaults to .Immediate. See https://www.sqlite.org/lang_transaction.html
+    ///       defaults to .immediate. See https://www.sqlite.org/lang_transaction.html
     ///       for more information.
     ///     - block: A block that executes SQL statements and return either
-    ///       .Commit or .Rollback.
+    ///       .commit or .rollback.
     /// - throws: The error thrown by the block.
-    public func inTransaction(kind: TransactionKind? = nil, _ block: (db: Database) throws -> TransactionCompletion) throws {
-        try serializedDatabase.performSync { db in
+    public func inTransaction(_ kind: Database.TransactionKind? = nil, _ block: (Database) throws -> Database.TransactionCompletion) throws {
+        try serializedDatabase.sync { db in
             try db.inTransaction(kind) {
-                try block(db: db)
+                try block(db)
             }
         }
     }
@@ -121,7 +121,7 @@ public final class DatabaseQueue {
     ///
     /// See also setupMemoryManagement(application:)
     public func releaseMemory() {
-        serializedDatabase.performSync { db in
+        serializedDatabase.sync { db in
             db.releaseMemory()
         }
     }
@@ -135,37 +135,37 @@ public final class DatabaseQueue {
     /// - param application: The UIApplication that will start a background
     ///   task to let the database queue release its memory when the application
     ///   enters background.
-    public func setupMemoryManagement(application application: UIApplication) {
+    public func setupMemoryManagement(in application: UIApplication) {
         self.application = application
-        let center = NSNotificationCenter.defaultCenter()
-        center.addObserver(self, selector: #selector(DatabaseQueue.applicationDidReceiveMemoryWarning(_:)), name: UIApplicationDidReceiveMemoryWarningNotification, object: nil)
-        center.addObserver(self, selector: #selector(DatabaseQueue.applicationDidEnterBackground(_:)), name: UIApplicationDidEnterBackgroundNotification, object: nil)
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(DatabaseQueue.applicationDidReceiveMemoryWarning(_:)), name: .UIApplicationDidReceiveMemoryWarning, object: nil)
+        center.addObserver(self, selector: #selector(DatabaseQueue.applicationDidEnterBackground(_:)), name: .UIApplicationDidEnterBackground, object: nil)
     }
     
     private var application: UIApplication?
     
-    @objc private func applicationDidEnterBackground(notification: NSNotification) {
+    @objc private func applicationDidEnterBackground(_ notification: NSNotification) {
         guard let application = application else {
             return
         }
         
         var task: UIBackgroundTaskIdentifier! = nil
-        task = application.beginBackgroundTaskWithExpirationHandler(nil)
+        task = application.beginBackgroundTask(expirationHandler: nil)
         
         if task == UIBackgroundTaskInvalid {
             // Perform releaseMemory() synchronously.
             releaseMemory()
         } else {
             // Perform releaseMemory() asynchronously.
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
+            DispatchQueue.global().async {
                 self.releaseMemory()
                 application.endBackgroundTask(task)
             }
         }
     }
     
-    @objc private func applicationDidReceiveMemoryWarning(notification: NSNotification) {
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
+    @objc private func applicationDidReceiveMemoryWarning(_ notification: NSNotification) {
+        DispatchQueue.global().async {
             self.releaseMemory()
         }
     }
@@ -193,7 +193,7 @@ public final class DatabaseQueue {
     // > behavior is undefined.
     //
     // This is why we use a serialized database:
-    private var serializedDatabase: SerializedDatabase
+    fileprivate var serializedDatabase: SerializedDatabase
 }
 
 
@@ -204,9 +204,9 @@ public final class DatabaseQueue {
     extension DatabaseQueue {
         
         /// Changes the passphrase of an encrypted database
-        public func changePassphrase(passphrase: String) throws {
-            try serializedDatabase.performSync { db in
-                try db.changePassphrase(passphrase)
+        public func change(passphrase: String) throws {
+            try serializedDatabase.sync { db in
+                try db.change(passphrase: passphrase)
             }
         }
     }
@@ -223,15 +223,15 @@ extension DatabaseQueue : DatabaseReader {
     /// Alias for inDatabase
     ///
     /// This method is part of the DatabaseReader protocol adoption.
-    public func read<T>(block: (db: Database) throws -> T) rethrows -> T {
-        return try serializedDatabase.performSync(block)
+    public func read<T>(_ block: (Database) throws -> T) rethrows -> T {
+        return try serializedDatabase.sync(block)
     }
     
     /// Alias for inDatabase
     ///
     /// This method is part of the DatabaseReader protocol adoption.
-    public func nonIsolatedRead<T>(block: (db: Database) throws -> T) rethrows -> T {
-        return try serializedDatabase.performSync(block)
+    public func nonIsolatedRead<T>(_ block: (Database) throws -> T) rethrows -> T {
+        return try serializedDatabase.sync(block)
     }
     
     
@@ -246,20 +246,20 @@ extension DatabaseQueue : DatabaseReader {
     ///         }
     ///         return int + 1
     ///     }
-    ///     dbQueue.addFunction(fn)
+    ///     dbQueue.add(function: fn)
     ///     dbQueue.inDatabase { db in
     ///         Int.fetchOne(db, "SELECT succ(1)") // 2
     ///     }
-    public func addFunction(function: DatabaseFunction) {
-        serializedDatabase.performSync { db in
-            db.addFunction(function)
+    public func add(function: DatabaseFunction) {
+        serializedDatabase.sync { db in
+            db.add(function: function)
         }
     }
     
     /// Remove an SQL function.
-    public func removeFunction(function: DatabaseFunction) {
-        serializedDatabase.performSync { db in
-            db.removeFunction(function)
+    public func remove(function: DatabaseFunction) {
+        serializedDatabase.sync { db in
+            db.remove(function: function)
         }
     }
     
@@ -271,20 +271,20 @@ extension DatabaseQueue : DatabaseReader {
     ///     let collation = DatabaseCollation("localized_standard") { (string1, string2) in
     ///         return (string1 as NSString).localizedStandardCompare(string2)
     ///     }
-    ///     dbQueue.addCollation(collation)
+    ///     dbQueue.add(collation: collation)
     ///     try dbQueue.inDatabase { db in
     ///         try db.execute("CREATE TABLE files (name TEXT COLLATE LOCALIZED_STANDARD")
     ///     }
-    public func addCollation(collation: DatabaseCollation) {
-        serializedDatabase.performSync { db in
-            db.addCollation(collation)
+    public func add(collation: DatabaseCollation) {
+        serializedDatabase.sync { db in
+            db.add(collation: collation)
         }
     }
     
     /// Remove a collation.
-    public func removeCollation(collation: DatabaseCollation) {
-        serializedDatabase.performSync { db in
-            db.removeCollation(collation)
+    public func remove(collation: DatabaseCollation) {
+        serializedDatabase.sync { db in
+            db.remove(collation: collation)
         }
     }
 }
@@ -300,15 +300,15 @@ extension DatabaseQueue : DatabaseWriter {
     /// Alias for inDatabase
     ///
     /// This method is part of the DatabaseWriter protocol adoption.
-    public func write<T>(block: (db: Database) throws -> T) rethrows -> T {
-        return try serializedDatabase.performSync(block)
+    public func write<T>(_ block: (Database) throws -> T) rethrows -> T {
+        return try serializedDatabase.sync(block)
     }
 
     /// Executes *block*.
     ///
     /// This method is part of the DatabaseWriter protocol adoption, and must
     /// be called from the protected database dispatch queue.
-    public func readFromWrite(block: (db: Database) -> Void) {
-        serializedDatabase.perform(block)
+    public func readFromWrite(_ block: @escaping (Database) -> Void) {
+        serializedDatabase.execute(block)
     }
 }

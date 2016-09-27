@@ -1,4 +1,17 @@
-- [ ] GRDBCipher: remove limitations on iOS or OS X versions
+- [ ] Remove DatabaseWriter.writeForIssue117 when https://bugs.swift.org/browse/SR-2623 is fixed (remove `writeForIssue117`, use `write` instead, and build in Release configuration) 
+- [ ] Restore SQLCipher
+- [ ] Restore dispatching tests in GRDBOSXTests (they are disabled in order to avoid linker errors)
+    - DatabasePoolReleaseMemoryTests
+    - DatabasePoolSchemaCacheTests
+    - DatabaseQueueReleaseMemoryTests
+    - DatabasePoolBackupTests
+    - DatabasePoolConcurrencyTests
+    - DatabasePoolReadOnlyTests
+    - DatabaseQueueConcurrencyTests
+- [ ] FetchedRecordsController throttling (suggested by @hdlj)
+- [ ] Test Row.value(SQLColumn)
+- [ ] What is the behavior inTransaction and inSavepoint behaviors in case of commit error? Code looks like we do not rollback, leaving the app in a weird state (out of Swift transaction block with a SQLite transaction that may still be opened).
+- [ ] GRDBCipher / custom SQLite builds: remove limitations on iOS or OS X versions
 - [ ] FetchedRecordsController: take inspiration from https://github.com/jflinter/Dwifft
 - [ ] File protection: Read https://github.com/ccgus/fmdb/issues/262 and understand https://lists.apple.com/archives/cocoa-dev/2012/Aug/msg00527.html
 - [ ] Support for resource values (see https://developer.apple.com/library/ios/qa/qa1719/_index.html)
@@ -11,13 +24,17 @@
     - [ ] LIKE https://www.sqlite.org/lang_expr.html
     - [ ] GLOB https://www.sqlite.org/lang_expr.html
     - [ ] MATCH https://www.sqlite.org/lang_expr.html
+    	FTSPattern.token("database") =~ Column("body")
     - [ ] REGEXP https://www.sqlite.org/lang_expr.html
     - [ ] CASE x WHEN w1 THEN r1 WHEN w2 THEN r2 ELSE r3 END https://www.sqlite.org/lang_expr.html
-- [ ] In-memory DatabasePool (https://www.sqlite.org/inmemorydb.html). Unfortunately, a shared cache is not enough. Since SQLite does not provide WAL mode for in-memory databases, it's easy to get "database is locked" errors. A WAL database on a RAM disk looks out of reach. Possible solution: have one writer that is exclusive with the readers.
 
 
 Not sure
 
+- [X] Have Row adopt LiteralDictionaryConvertible
+    - [ ] ... allowing non unique column names
+- [ ] Remove DatabaseValue.value()
+    - [X] Don't talk about DatabaseValue.value() in README.md
 - [ ] Support for NSColor/UIColor. Beware UIColor components can go beyond [0, 1.0] in iOS10.
 
 
@@ -42,3 +59,8 @@ Reading list:
 - https://www.zetetic.net/sqlcipher/
 - https://sqlite.org/sharedcache.html
 - Amazing tip from Xcode labs: add a EXCLUDED_SOURCE_FILE_NAMES build setting to conditionally exclude sources for different configuration: https://twitter.com/zats/status/74386298602026496
+- SQLITE_ENABLE_SQLLOG: http://mjtsai.com/blog/2016/07/19/sqlite_enable_sqllog/
+- [Writing High-Performance Swift Code](https://github.com/apple/swift/blob/master/docs/OptimizationTips.rst)
+- http://docs.diesel.rs/diesel/associations/index.html
+- http://cocoamine.net/blog/2015/09/07/contentless-fts4-for-large-immutable-documents/
+- https://discuss.zetetic.net/t/important-advisory-sqlcipher-with-xcode-8-and-ios-10/1688

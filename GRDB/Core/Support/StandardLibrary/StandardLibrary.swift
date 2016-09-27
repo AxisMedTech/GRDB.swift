@@ -7,6 +7,12 @@
         #else
             import SQLiteiPhoneOS
         #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
+        #endif
     #endif
 #endif
 
@@ -31,7 +37,7 @@ extension Bool: DatabaseValueConvertible, StatementColumnConvertible {
     }
     
     /// Returns a Bool initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Bool? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Bool? {
         // IMPLEMENTATION NOTE
         //
         // https://www.sqlite.org/lang_expr.html#booleanexpr
@@ -89,9 +95,9 @@ extension Bool: DatabaseValueConvertible, StatementColumnConvertible {
         // store big numbers as Real.
         
         switch databaseValue.storage {
-        case .Int64(let int64):
+        case .int64(let int64):
             return (int64 != 0)
-        case .Double(let double):
+        case .double(let double):
             return (double != 0.0)
         default:
             return nil
@@ -119,13 +125,13 @@ extension Int: DatabaseValueConvertible, StatementColumnConvertible {
     }
     
     /// Returns an Int initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Int? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Int? {
         switch databaseValue.storage {
-        case .Int64(let int64):
+        case .int64(let int64):
             guard int64 >= Int64(Int.min) else { return nil }
             guard int64 <= Int64(Int.max) else { return nil }
             return Int(int64)
-        case .Double(let double):
+        case .double(let double):
             // Cast from Double to Int64 to Int
             // Why? Because on 32-bits platforms we'll convert more values this way (Swift bug?)
             // - Int(Int64(-2147483648.999999))  // -2147483648
@@ -162,13 +168,13 @@ extension Int32: DatabaseValueConvertible, StatementColumnConvertible {
     }
     
     /// Returns an Int32 initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Int32? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Int32? {
         switch databaseValue.storage {
-        case .Int64(let int64):
+        case .int64(let int64):
             guard int64 >= Int64(Int32.min) else { return nil }
             guard int64 <= Int64(Int32.max) else { return nil }
             return Int32(int64)
-        case .Double(let double):
+        case .double(let double):
             // Cast from Double to Int64 to Int32
             // Why? Because we'll convert more values this way (Swift bug?)
             // - Int32(Int64(-2147483648.999999))  // -2147483648
@@ -199,15 +205,15 @@ extension Int64: DatabaseValueConvertible, StatementColumnConvertible {
     
     /// Returns a value that can be stored in the database.
     public var databaseValue: DatabaseValue {
-        return DatabaseValue(storage: .Int64(self))
+        return DatabaseValue(storage: .int64(self))
     }
     
     /// Returns an Int64 initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Int64? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Int64? {
         switch databaseValue.storage {
-        case .Int64(let int64):
+        case .int64(let int64):
             return int64
-        case .Double(let double):
+        case .double(let double):
             guard double >= Double(Int64.min) else { return nil }
             guard double < Double(Int64.max) else { return nil }
             return Int64(double)
@@ -231,15 +237,15 @@ extension Double: DatabaseValueConvertible, StatementColumnConvertible {
     
     /// Returns a value that can be stored in the database.
     public var databaseValue: DatabaseValue {
-        return DatabaseValue(storage: .Double(self))
+        return DatabaseValue(storage: .double(self))
     }
     
     /// Returns a Double initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Double? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Double? {
         switch databaseValue.storage {
-        case .Int64(let int64):
+        case .int64(let int64):
             return Double(int64)
-        case .Double(let double):
+        case .double(let double):
             return double
         default:
             return nil
@@ -265,11 +271,11 @@ extension Float: DatabaseValueConvertible, StatementColumnConvertible {
     }
     
     /// Returns a Float initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Float? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Float? {
         switch databaseValue.storage {
-        case .Int64(let int64):
+        case .int64(let int64):
             return Float(int64)
-        case .Double(let double):
+        case .double(let double):
             return Float(double)
         default:
             return nil
@@ -286,19 +292,18 @@ extension String: DatabaseValueConvertible, StatementColumnConvertible {
     ///     - sqliteStatement: A pointer to an SQLite statement.
     ///     - index: The column index.
     public init(sqliteStatement: SQLiteStatement, index: Int32) {
-        let cString = UnsafePointer<Int8>(sqlite3_column_text(sqliteStatement, Int32(index)))
-        self = String.fromCString(cString)!
+        self = String(cString: sqlite3_column_text(sqliteStatement, Int32(index))!)
     }
     
     /// Returns a value that can be stored in the database.
     public var databaseValue: DatabaseValue {
-        return DatabaseValue(storage: .String(self))
+        return DatabaseValue(storage: .string(self))
     }
     
     /// Returns a String initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> String? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> String? {
         switch databaseValue.storage {
-        case .String(let string):
+        case .string(let string):
             return string
         default:
             return nil
@@ -310,121 +315,121 @@ extension String: DatabaseValueConvertible, StatementColumnConvertible {
 // MARK: - SQL Functions
 
 extension DatabaseFunction {
-    /// An SQL function that returns the Swift built-in capitalizedString
+    /// An SQL function that returns the Swift built-in capitalized
     /// String property.
     ///
     /// The function returns NULL for non-strings values.
     ///
     /// This function is automatically added by GRDB to your database
     /// connections. It is the function used by the query interface's
-    /// capitalizedString:
+    /// capitalized:
     ///
-    ///     let nameColumn = SQLColumn("name")
-    ///     let request = Person.select(nameColumn.capitalizedString)
+    ///     let nameColumn = Column("name")
+    ///     let request = Person.select(nameColumn.capitalized)
     ///     let names = String.fetchAll(dbQueue, request)   // [String]
-    public static let capitalizedString = DatabaseFunction("swiftCapitalizedString", argumentCount: 1, pure: true) { databaseValues in
+    public static let capitalize = DatabaseFunction("swiftCapitalizedString", argumentCount: 1, pure: true) { databaseValues in
         guard let string = String.fromDatabaseValue(databaseValues[0]) else {
             return nil
         }
-        return string.capitalizedString
+        return string.capitalized
     }
     
-    /// An SQL function that returns the Swift built-in lowercaseString
+    /// An SQL function that returns the Swift built-in lowercased
     /// String property.
     ///
     /// The function returns NULL for non-strings values.
     ///
     /// This function is automatically added by GRDB to your database
     /// connections. It is the function used by the query interface's
-    /// lowercaseString:
+    /// lowercased:
     ///
-    ///     let nameColumn = SQLColumn("name")
-    ///     let request = Person.select(nameColumn.lowercaseString)
+    ///     let nameColumn = Column("name")
+    ///     let request = Person.select(nameColumn.lowercased())
     ///     let names = String.fetchAll(dbQueue, request)   // [String]
-    public static let lowercaseString = DatabaseFunction("swiftLowercaseString", argumentCount: 1, pure: true) { databaseValues in
+    public static let lowercase = DatabaseFunction("swiftLowercaseString", argumentCount: 1, pure: true) { databaseValues in
         guard let string = String.fromDatabaseValue(databaseValues[0]) else {
             return nil
         }
-        return string.lowercaseString
+        return string.lowercased()
     }
     
-    /// An SQL function that returns the Swift built-in uppercaseString
+    /// An SQL function that returns the Swift built-in uppercased
     /// String property.
     ///
     /// The function returns NULL for non-strings values.
     ///
     /// This function is automatically added by GRDB to your database
     /// connections. It is the function used by the query interface's
-    /// uppercaseString:
+    /// uppercased:
     ///
-    ///     let nameColumn = SQLColumn("name")
-    ///     let request = Person.select(nameColumn.uppercaseString)
+    ///     let nameColumn = Column("name")
+    ///     let request = Person.select(nameColumn.uppercased())
     ///     let names = String.fetchAll(dbQueue, request)   // [String]
-    public static let uppercaseString = DatabaseFunction("swiftUppercaseString", argumentCount: 1, pure: true) { databaseValues in
+    public static let uppercase = DatabaseFunction("swiftUppercaseString", argumentCount: 1, pure: true) { databaseValues in
         guard let string = String.fromDatabaseValue(databaseValues[0]) else {
             return nil
         }
-        return string.uppercaseString
+        return string.uppercased()
     }
 }
 
 @available(iOS 9.0, OSX 10.11, *)
 extension DatabaseFunction {
     /// An SQL function that returns the Swift built-in
-    /// localizedCapitalizedString String property.
+    /// localizedCapitalized String property.
     ///
     /// The function returns NULL for non-strings values.
     ///
     /// This function is automatically added by GRDB to your database
     /// connections. It is the function used by the query interface's
-    /// localizedCapitalizedString:
+    /// localizedCapitalized:
     ///
-    ///     let nameColumn = SQLColumn("name")
-    ///     let request = Person.select(nameColumn.localizedCapitalizedString)
+    ///     let nameColumn = Column("name")
+    ///     let request = Person.select(nameColumn.localizedCapitalized)
     ///     let names = String.fetchAll(dbQueue, request)   // [String]
-    public static let localizedCapitalizedString = DatabaseFunction("swiftLocalizedCapitalizedString", argumentCount: 1, pure: true) { databaseValues in
+    public static let localizedCapitalize = DatabaseFunction("swiftLocalizedCapitalizedString", argumentCount: 1, pure: true) { databaseValues in
         guard let string = String.fromDatabaseValue(databaseValues[0]) else {
             return nil
         }
-        return string.localizedCapitalizedString
+        return string.localizedCapitalized
     }
     
     /// An SQL function that returns the Swift built-in
-    /// localizedLowercaseString String property.
+    /// localizedLowercased String property.
     ///
     /// The function returns NULL for non-strings values.
     ///
     /// This function is automatically added by GRDB to your database
     /// connections. It is the function used by the query interface's
-    /// localizedLowercaseString:
+    /// localizedLowercased:
     ///
-    ///     let nameColumn = SQLColumn("name")
-    ///     let request = Person.select(nameColumn.localizedLowercaseString)
+    ///     let nameColumn = Column("name")
+    ///     let request = Person.select(nameColumn.localizedLowercased)
     ///     let names = String.fetchAll(dbQueue, request)   // [String]
-    public static let localizedLowercaseString = DatabaseFunction("swiftLocalizedLowercaseString", argumentCount: 1, pure: true) { databaseValues in
+    public static let localizedLowercase = DatabaseFunction("swiftLocalizedLowercaseString", argumentCount: 1, pure: true) { databaseValues in
         guard let string = String.fromDatabaseValue(databaseValues[0]) else {
             return nil
         }
-        return string.localizedLowercaseString
+        return string.localizedLowercase
     }
     
     /// An SQL function that returns the Swift built-in
-    /// localizedUppercaseString String property.
+    /// localizedUppercased String property.
     ///
     /// The function returns NULL for non-strings values.
     ///
     /// This function is automatically added by GRDB to your database
     /// connections. It is the function used by the query interface's
-    /// localizedUppercaseString:
+    /// localizedUppercased:
     ///
-    ///     let nameColumn = SQLColumn("name")
-    ///     let request = Person.select(nameColumn.localizedUppercaseString)
+    ///     let nameColumn = Column("name")
+    ///     let request = Person.select(nameColumn.localizedUppercased)
     ///     let names = String.fetchAll(dbQueue, request)   // [String]
-    public static let localizedUppercaseString = DatabaseFunction("swiftLocalizedUppercaseString", argumentCount: 1, pure: true) { databaseValues in
+    public static let localizedUppercase = DatabaseFunction("swiftLocalizedUppercaseString", argumentCount: 1, pure: true) { databaseValues in
         guard let string = String.fromDatabaseValue(databaseValues[0]) else {
             return nil
         }
-        return string.localizedUppercaseString
+        return string.localizedUppercase
     }
 }
 
@@ -458,7 +463,7 @@ extension DatabaseCollation {
     ///         ")"
     ///     )
     public static let unicodeCompare = DatabaseCollation("swiftCompare") { (lhs, rhs) in
-        return (lhs < rhs) ? .OrderedAscending : ((lhs == rhs) ? .OrderedSame : .OrderedDescending)
+        return (lhs < rhs) ? .orderedAscending : ((lhs == rhs) ? .orderedSame : .orderedDescending)
     }
     
     /// A collation, or SQL string comparison function, that compares strings

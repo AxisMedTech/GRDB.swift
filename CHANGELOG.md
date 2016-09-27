@@ -1,6 +1,619 @@
 Release Notes
 =============
 
+## Next Version
+
+**New**
+
+- `TableMapping` protocol learned how to delete all records right from the adopting type:
+    
+    ```swift
+    try Person.deleteAll(db)
+    ```
+
+## 0.84.0
+
+Released September 16, 2016
+
+**New**
+
+- The Persistable protocol learned about conflict resolution, and can run `INSERT OR REPLACE` queries ([documentation](https://github.com/groue/GRDB.swift/tree/Issue118#conflict-resolution), fixes [#118](https://github.com/groue/GRDB.swift/issues/118)).
+
+
+## 0.83.0
+
+Released September 16, 2016
+
+**New**
+
+- Upgrade custom SQLite builds to [v3.14.1](http://www.sqlite.org/changes.html).
+
+**Fixed**
+
+- Restore support for SQLite [pre-update hooks](https://github.com/groue/GRDB.swift#support-for-sqlite-pre-update-hooks)
+- `DatabaseValue.fromDatabaseValue()` returns `.Null` for NULL input, instead of nil (fixes [#119](https://github.com/groue/GRDB.swift/issues/119))
+
+**Breaking Change**
+
+- `Row.databaseValue(atIndex:)` and `Row.databaseValue(named:)` have been removed. Use `value(atIndex:)` and `value(named:)` instead:
+    
+    ```diff
+    -let dbv = row.databaseValue(atIndex: 0)
+    +let dbv: DatabaseValue = row.value(atIndex: 0)
+    ```
+
+
+## 0.82.1
+
+Released September 14, 2016
+
+**Fixed**
+
+- GRDB builds in the Release configuration (fix [#116](https://github.com/groue/GRDB.swift/issues/116), [#117](https://github.com/groue/GRDB.swift/issues/117), workaround [SR-2623](https://bugs.swift.org/browse/SR-2623))
+
+
+## 0.82.0
+
+Released September 11, 2016
+
+**New**
+
+- Swift 3
+
+**Breaking Changes**
+
+- The Swift 3 *Grand Renaming* has impacted GRDB a lot.
+    
+    **General**
+    
+    - All enum cases now start with a lowercase letter.
+    
+    **Database Connections**
+    
+    ```diff
+    -typealias BusyCallback = (numberOfTries: Int) -> Bool
+    -enum BusyMode
+    -enum CheckpointMode
+    -enum TransactionKind
+    -enum TransactionCompletion
+     struct Configuration {
+    -    var fileAttributes: [String: AnyObject]?
+    +    var fileAttributes: [FileAttributeKey: Any]
+     }
+     class Database {
+    +    typealias BusyCallback = (_ numberOfTries: Int) -> Bool
+    +    enum BusyMode {
+    +        case immediateError
+    +        case timeout(TimeInterval)
+    +        case callback(BusyCallback)
+    +    }
+    +    enum CheckpointMode: Int32 {
+    +        case passive
+    +        case full
+    +        case restart
+    +        case truncate
+    +    }
+    +    enum TransactionKind {
+    +        case deferred
+    +        case immediate
+    +        case exclusive
+    +    }
+    +    enum TransactionCompletion {
+    +        case commit
+    +        case rollback
+    +    }
+     }
+     class DatabasePool {
+    #if os(iOS)
+    -    func setupMemoryManagement(application application: UIApplication)
+    +    func setupMemoryManagement(in application: UIApplication) 
+    #endif
+    #if SQLITE_HAS_CODEC
+    -    func changePassphrase(passphrase: String) throws
+    +    func change(passphrase: String) throws
+    #endif
+     }
+     class DatabaseQueue {
+    #if os(iOS)
+    -    func setupMemoryManagement(application application: UIApplication)
+    +    func setupMemoryManagement(in application: UIApplication) 
+    #endif
+    #if SQLITE_HAS_CODEC
+    -    func changePassphrase(passphrase: String) throws
+    +    func change(passphrase: String) throws
+    #endif
+     }
+    ```
+    
+    **Rows**
+    
+    ```diff
+     final class Row {
+    -    init?(_ dictionary: NSDictionary)
+    -    func toNSDictionary() -> NSDictionary
+    +    init?(_ dictionary: [AnyHashable: Any])
+     }
+    ```
+    
+    **Values**
+    
+    ```diff
+     struct DatabaseValue {
+    -    init?(object: AnyObject)
+    -    func toAnyObject() -> AnyObject
+    +    init?(value: Any)
+     }
+     protocol DatabaseValueConvertible {
+    -    static func fromDatabaseValue(databaseValue: DatabaseValue) -> DatabaseValue?
+    +    static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> DatabaseValue?
+     }
+    +extension Data : DatabaseValueConvertible
+    +extension Date : DatabaseValueConvertible
+    +extension URL : DatabaseValueConvertible
+    +extension UUID : DatabaseValueConvertible
+    ```
+    
+    **SQL Functions**
+    
+    ```diff
+     class Database {
+    -    func addFunction(function: DatabaseFunction)
+    -    func removeFunction(function: DatabaseFunction)
+    +    func add(function: DatabaseFunction)
+    +    func remove(function: DatabaseFunction)
+     }
+     class DatabasePool {
+    -    func addFunction(function: DatabaseFunction)
+    -    func removeFunction(function: DatabaseFunction)
+    +    func add(function: DatabaseFunction)
+    +    func remove(function: DatabaseFunction)
+     }
+     class DatabaseQueue {
+    -    func addFunction(function: DatabaseFunction)
+    -    func removeFunction(function: DatabaseFunction)
+    +    func add(function: DatabaseFunction)
+    +    func remove(function: DatabaseFunction)
+     }
+     protocol DatabaseReader {
+    -    func addFunction(function: DatabaseFunction)
+    -    func removeFunction(function: DatabaseFunction)
+    +    func add(function: DatabaseFunction)
+    +    func remove(function: DatabaseFunction)
+     }
+     extension DatabaseFunction {
+    -static let capitalizedString: DatabaseFunction
+    -static let lowercaseString: DatabaseFunction
+    -static let uppercaseString: DatabaseFunction
+    -static let localizedCapitalizedString: DatabaseFunction
+    -static let localizedLowercaseString: DatabaseFunction
+    -static let localizedUppercaseString: DatabaseFunction
+    +static let capitalize: DatabaseFunction
+    +static let lowercase: DatabaseFunction
+    +static let uppercase: DatabaseFunction
+    +static let localizedCapitalize: DatabaseFunction
+    +static let localizedLowercase: DatabaseFunction
+    +static let localizedUppercase: DatabaseFunction
+     }
+    ```
+    
+    
+    **SQL Collations**
+    
+    ```diff
+     class Database {
+    -    func addCollation(collation: DatabaseCollation)
+    -    func removeCollation(collation: DatabaseCollation)
+    +    func add(collation: DatabaseCollation)
+    +    func remove(collation: DatabaseCollation)
+     }
+     class DatabasePool {
+    -    func addCollation(collation: DatabaseCollation)
+    -    func removeCollation(collation: DatabaseCollation)
+    +    func add(collation: DatabaseCollation)
+    +    func remove(collation: DatabaseCollation)
+     }
+     class DatabaseQueue {
+    -    func addCollation(collation: DatabaseCollation)
+    -    func removeCollation(collation: DatabaseCollation)
+    +    func add(collation: DatabaseCollation)
+    +    func remove(collation: DatabaseCollation)
+     }
+     protocol DatabaseReader {
+    -    func addCollation(collation: DatabaseCollation)
+    -    func removeCollation(collation: DatabaseCollation)
+    +    func add(collation: DatabaseCollation)
+    +    func remove(collation: DatabaseCollation)
+     }
+    ```
+    
+    **Prepared Statements**
+    
+    ```diff
+     class Database {
+    -    func selectStatement(sql: String) throws -> SelectStatement
+    -    func updateStatement(sql: String) throws -> SelectStatement
+    +    func makeSelectStatement(_ sql: String) throws -> SelectStatement
+    +    func makeUpdateStatement(_ sql: String) throws -> SelectStatement
+     }
+     class Statement {
+    -    func validateArguments(arguments: StatementArguments) throws
+    +    func validate(arguments: StatementArguments) throws
+     }
+     struct StatementArguments {
+    -    init?(_ array: NSArray)
+    -    init?(_ dictionary: NSDictionary)
+    +    init?(_ array: [Any])
+    +    init?(_ dictionary: [AnyHashable: Any])
+     }
+    ```
+    
+    **Transaction Observers**
+    
+    Database events filtering is now performed by transaction observers themselves, in the new `observes(eventsOfKind:)` method of the `TransactionObserver` protocol.
+    
+    ```diff
+     class Database {
+    -    func addTransactionObserver(transactionObserver: TransactionObserverType, forDatabaseEvents filter: ((DatabaseEventKind) -> Bool)? = nil)
+    -    func removeTransactionObserver(transactionObserver: TransactionObserverType)
+    +    func add(transactionObserver: TransactionObserver)
+    +    func remove(transactionObserver: TransactionObserver)
+     }
+     protocol DatabaseWriter : DatabaseReader {
+    -    func addTransactionObserver(transactionObserver: TransactionObserverType, forDatabaseEvents filter: ((DatabaseEventKind) -> Bool)? = nil)
+    -    func removeTransactionObserver(transactionObserver: TransactionObserverType)
+    +    func add(transactionObserver: TransactionObserver)
+    +    func remove(transactionObserver: TransactionObserver)
+     }
+    -protocol TransactionObserverType : class {
+    +protocol TransactionObserver : class {
+    -    func databaseDidChangeWithEvent(event: DatabaseEvent)
+    -    func databaseDidCommit(db: Database)
+    -    func databaseDidRollback(db: Database)
+    +    func observes(eventsOfKind eventKind: DatabaseEventKind) -> Bool
+    +    func databaseDidChange(with event: DatabaseEvent)
+    +    func databaseDidCommit(_ db: Database)
+    +    func databaseDidRollback(_ db: Database)
+     #if SQLITE_ENABLE_PREUPDATE_HOOK
+    -    func databaseWillChangeWithEvent(event: DatabasePreUpdateEvent)
+    +    func databaseWillChange(with event: DatabasePreUpdateEvent)
+     #endif
+     }
+    ```
+    
+    **Records**
+    
+    ```diff
+     protocol RowConvertible {
+    -    init(_ row: Row)
+    +    init(row: Row)
+     }
+     protocol MutablePersistable {
+    -    mutating func didInsertWithRowID(rowID: Int64, forColumn column: String?)
+    -    mutating func insert(db: Database) throws
+    -    func update(db: Database, columns: Set<String>) throws
+    -    mutating func save(db: Database) throws
+    -    func delete(db: Database) throws -> Bool
+    -    func exists(db: Database) -> Bool
+    +    mutating func didInsert(with rowID: Int64, for column: String?)
+    +    mutating func insert(_ db: Database) throws
+    +    func update(_ db: Database, columns: Set<String>) throws
+    +    mutating func save(_ db: Database) throws
+    +    @discardableResult func delete(_ db: Database) throws -> Bool
+    +    func exists(_ db: Database) -> Bool
+     }
+     protocol Persistable : MutablePersistable {
+    -    func didInsertWithRowID(rowID: Int64, forColumn column: String?)
+    -    func insert(db: Database) throws
+    -    func save(db: Database) throws
+    +    func didInsert(with rowID: Int64, for column: String?)
+    +    func insert(_ db: Database) throws
+    +    func save(_ db: Database) throws
+     }
+     protocol TableMapping {
+    -    static func databaseTableName() -> String
+    +    static var databaseTableName: String { get }
+     }
+    -public class Record : RowConvertible, TableMapping, Persistable {
+    +open class Record : RowConvertible, TableMapping, Persistable {
+    -    required init(_ row: Row)
+    -    class func databaseTableName() -> String
+    -    func awakeFromFetch(row row: Row)
+    -    func didInsertWithRowID(rowID: Int64, forColumn column: String?)
+    -    func update(db: Database, columns: Set<String>) throws
+    -    func insert(db: Database) throws
+    -    func save(db: Database) throws
+    -    func delete(db: Database) throws -> Bool
+    +    required init(row: Row)
+    +    class var databaseTableName: String
+    +    func awakeFromFetch(row: Row)
+    +    func didInsert(with rowID: Int64, for column: String?)
+    +    func update(_ db: Database, columns: Set<String>) throws
+    +    func insert(_ db: Database) throws
+    +    func save(_ db: Database) throws
+    +    @discardableResult func delete(_ db: Database) throws -> Bool
+     }
+    ```
+    
+    **Query Interface**
+    
+    ```diff
+     protocol FetchRequest {
+    -    func prepare(db: Database) throws -> (SelectStatement, RowAdapter?)
+    +    func prepare(_ db: Database) throws -> (SelectStatement, RowAdapter?)
+     }
+    -struct SQLColumn {}
+    +struct Column {}
+     struct QueryInterfaceRequest<T> {
+    -    var distinct: QueryInterfaceRequest<T> { get }
+    -    var exists: _SQLExpression { get }
+    -    func reverse() -> QueryInterfaceRequest<T>
+    +    func distinct() -> QueryInterfaceRequest<T>
+    +    func exists() -> _SQLExpression
+    +    func reversed() -> QueryInterfaceRequest<T>
+     }
+     extension _SpecificSQLExpressible {
+    -    var capitalizedString: _SQLExpression { get }
+    -    var lowercaseString: _SQLExpression { get }
+    -    var uppercaseString: _SQLExpression { get }
+    -    var localizedCapitalizedString: _SQLExpression { get }
+    -    var localizedLowercaseString: _SQLExpression { get }
+    -    var localizedUppercaseString: _SQLExpression { get }
+    +    var capitalized: _SQLExpression { get }
+    +    var lowercased: _SQLExpression { get }
+    +    var uppercased: _SQLExpression { get }
+    +    var localizedCapitalized: _SQLExpression { get }
+    +    var localizedLowercased: _SQLExpression { get }
+    +    var localizedUppercased: _SQLExpression { get }
+     }
+    ```
+
+
+## 0.81.1 (Swift 2.3)
+
+Released September 16, 2016
+
+**New**
+
+- Upgrade custom SQLite builds to v3.14.1.
+
+**Fixed**
+
+- `DatabaseValue.fromDatabaseValue()` returns `.Null` for NULL input, instead of nil (fixes [#119](https://github.com/groue/GRDB.swift/issues/119))
+
+**Breaking Change**
+
+- `Row.databaseValue(atIndex:)` and `Row.databaseValue(named:)` have been removed. Use `value(atIndex:)` and `value(named:)` instead:
+    
+    ```diff
+    -let dbv = row.databaseValue(atIndex: 0)
+    +let dbv: DatabaseValue = row.value(atIndex: 0)
+    ```
+    
+
+## 0.81.0 (Swift 2.3)
+
+Released September 10, 2016
+
+**New**
+
+- Swift 2.3
+
+
+## 0.80.2 (Swift 2.2)
+
+Released September 9, 2016
+
+**Fixed**
+
+- WatchOS framework
+
+
+## 0.80.1
+
+Released September 8, 2016
+
+**Fixed**
+
+- WatchOS framework is now available through CocoaPods.
+
+
+## 0.80.0
+
+Released September 7, 2016
+
+**Fixed**
+
+- `Database.tableExists()` learned about temporary tables
+
+**New**
+
+- WatchOS support
+
+- `QueryInterfaceRequest.deleteAll()` deletes database rows:
+
+    ```swift
+    try Wine.filter(corked == true).deleteAll(db)
+    ```
+
+
+## 0.79.4
+
+Released August 17, 2016
+
+**Fixed**
+
+- [DatabasePool](https://github.com/groue/GRDB.swift#database-pools) can now open an existing database which is not yet in the WAL mode, and then immediately read from it. It used to crash unless at least one write operation was performed before any read (fixes [#102](https://github.com/groue/GRDB.swift/issues/102)).
+
+
+## 0.79.3
+
+Released August 16, 2016
+
+**Fixed**
+
+- [Table creation DSL](https://github.com/groue/GRDB.swift#database-schema) accepts auto references with implicit primary key:
+
+    ```swift
+    try db.create(table: "nodes") { t in
+        t.column("id", .Integer).primaryKey()
+        t.column("parentId", .Integer).references("nodes")
+    }
+    ```
+
+**New**
+
+- Use SQLColumn of the [query interface](https://github.com/groue/GRDB.swift/#the-query-interface) when extracting values from rows:
+    
+    ```swift
+    let nameColumn = SQLColumn("name")
+    let name: String = row.value(nameColumn)
+    ```
+
+
+## 0.79.2
+
+Released August 10, 2016
+
+**Fixed**
+
+- Persistable used to generate sub optimal UPDATE requests.
+
+
+## 0.79.1
+
+Released August 10, 2016
+
+**Fixed**
+
+- [ColumnDefinition](https://github.com/groue/GRDB.swift#database-schema) `check` and `references` methods can now define several constraints:
+    
+    ```swift
+    try db.create(table: "users") { t in
+        t.column("name", .Text).notNull()
+            .check { length($0) > 0 }
+            .check { !["root", "admin"].contains($0) }
+    }
+    ```
+
+- [Persistable](https://github.com/groue/GRDB.swift#persistable-protocol) `update`, `exists` and `delete` methods now work with objects that have a nil primary key. They used to crash.
+
+- The `update(_:columns:)` method, which performs partial updates, no longer ignores unknown columns.
+
+
+## 0.79.0
+
+Released August 8, 2016
+
+**Breaking Change**
+
+- Column creation method `defaults(_:)` has been renamed `defaults(to:)`.
+    
+    ```swift
+    try db.create(table: "pointOfInterests") { t in
+        t.column("favorite", .Boolean).notNull().defaults(to: false)
+        ...
+    }
+    ```
+
+## 0.78.0
+
+Released August 6, 2016
+
+**New**
+
+- Upgrade sqlcipher to v3.4.0 ([announcement](https://discuss.zetetic.net/t/sqlcipher-3-4-0-release/1273), [changelog](https://github.com/sqlcipher/sqlcipher/blob/master/CHANGELOG.md))
+
+- DSL for table creation and updates (closes [#83](https://github.com/groue/GRDB.swift/issues/83), [documentation](https://github.com/groue/GRDB.swift#database-schema)):
+
+    ```swift
+    try db.create(table: "pointOfInterests") { t in
+        t.column("id", .Integer).primaryKey()
+        t.column("title", .Text)
+        t.column("favorite", .Boolean).notNull()
+        t.column("longitude", .Double).notNull()
+        t.column("latitude", .Double).notNull()
+    }
+    ```
+
+- Support for the `length` SQLite built-in function:
+    
+    ```swift
+    try db.create(table: "persons") { t in
+        t.column("name", .Text).check { length($0) > 0 }
+    }
+    ```
+
+- Row adopts DictionaryLiteralConvertible:
+
+    ```swift
+    let row: Row = ["name": "foo", "date": NSDate()]
+    ```
+
+
+**Breaking Changes**
+
+- Built-in SQLite collations used to be named by string: "NOCASE", etc. Now use the SQLCollation enum: `.Nocase`, etc.
+
+- PrimaryKey has been renamed PrimaryKeyInfo:
+
+    ```swift
+    let pk = db.primaryKey("persons")
+    pk.columns  // ["id"]
+    ```
+
+
+## 0.77.0
+
+Released July 28, 2016
+
+**New**
+
+- `Database.indexes(on:)` returns the indexes defined on a database table.
+
+- `Database.table(_:hasUniqueKey:)` returns true if a sequence of columns uniquely identifies a row, that is to say if the columns are the primary key, or if there is a unique index on them.
+
+- MutablePersistable types, including Record subclasses, support partial updates:
+    
+    ```swift
+    try person.update(db)                     // Full update
+    try person.update(db, columns: ["name"])  // Only updates the name column
+    ```
+
+**Breaking Changes**
+
+- MutablePersistable `update` and `performUpdate` methods have changed their signatures. You only have to care about this change if you customize the protocol `update` method.
+    
+    ```diff
+     protocol MutablePersistable : TableMapping {
+    -func update(db: Database) throws
+    +func update(db: Database, columns: Set<String>) throws
+     }
+     
+     extension MutablePersistable {
+     func update(db: Database) throws
+    +func update(db: Database, columns: Set<String>) throws
+    +func update<S: SequenceType where S.Generator.Element == SQLColumn>(db: Database, columns: S) throws
+    +func update<S: SequenceType where S.Generator.Element == String>(db: Database, columns: S) throws
+    -func performUpdate(db: Database) throws
+    +func performUpdate(db: Database, columns: Set<String>) throws
+     }
+    ```
+
+
+## 0.76.0
+
+Released July 19, 2016
+
+**Breaking Change**
+
+- The query interface `order` method now replaces any previously applied ordering (related issue: [#85](https://github.com/groue/GRDB.swift/issues/85)):
+    
+    ```swift
+    // SELECT * FROM "persons" ORDER BY "name"
+    Person.order(scoreColumn).order(nameColumn)
+    ```
+
+
 ## 0.75.2
 
 Released July 18, 2016

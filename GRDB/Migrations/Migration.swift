@@ -7,6 +7,12 @@
         #else
             import SQLiteiPhoneOS
         #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
+        #endif
     #endif
 #endif
 
@@ -16,22 +22,22 @@ struct Migration {
     // It is available from iOS 8.2 and OS X 10.10 https://github.com/yapstudios/YapDatabase/wiki/SQLite-version-(bundled-with-OS)
     let identifier: String
     let disabledForeignKeyChecks: Bool
-    let migrate: (db: Database) throws -> Void
+    let migrate: (Database) throws -> Void
     
-    init(identifier: String, migrate: (db: Database) throws -> Void) {
+    init(identifier: String, migrate: @escaping (Database) throws -> Void) {
         self.identifier = identifier
         self.disabledForeignKeyChecks = false
         self.migrate = migrate
     }
     
     @available(iOS 8.2, OSX 10.10, *)
-    init(identifier: String, disabledForeignKeyChecks: Bool, migrate: (db: Database) throws -> Void) {
+    init(identifier: String, disabledForeignKeyChecks: Bool, migrate: @escaping (Database) throws -> Void) {
         self.identifier = identifier
         self.disabledForeignKeyChecks = disabledForeignKeyChecks
         self.migrate = migrate
     }
     
-    func run(db: Database) throws {
+    func run(_ db: Database) throws {
         if #available(iOS 8.2, OSX 10.10, *) {
             if disabledForeignKeyChecks && Bool.fetchOne(db, "PRAGMA foreign_keys")! {
                 try runWithDisabledForeignKeys(db)
@@ -44,16 +50,16 @@ struct Migration {
     }
     
     
-    private func runWithoutDisabledForeignKeys(db: Database) throws {
-        try db.inTransaction(.Immediate) {
-            try self.migrate(db: db)
-            try self.insertAppliedIdentifier(db)
-            return .Commit
+    private func runWithoutDisabledForeignKeys(_ db: Database) throws {
+        try db.inTransaction(.immediate) {
+            try migrate(db)
+            try insertAppliedIdentifier(db)
+            return .commit
         }
     }
     
     @available(iOS 8.2, OSX 10.10, *)
-    private func runWithDisabledForeignKeys(db: Database) throws {
+    private func runWithDisabledForeignKeys(_ db: Database) throws {
         // Support for database alterations described at
         // https://www.sqlite.org/lang_altertable.html#otheralter
         //
@@ -67,9 +73,9 @@ struct Migration {
         }
         
         // > 2. Start a transaction.
-        try db.inTransaction(.Immediate) {
-            try self.migrate(db: db)
-            try self.insertAppliedIdentifier(db)
+        try db.inTransaction(.immediate) {
+            try migrate(db)
+            try insertAppliedIdentifier(db)
             
             // > 10. If foreign key constraints were originally enabled then run PRAGMA
             // > foreign_key_check to verify that the schema change did not break any foreign key
@@ -86,11 +92,11 @@ struct Migration {
             }
             
             // > 11. Commit the transaction started in step 2.
-            return .Commit
+            return .commit
         }
     }
     
-    private func insertAppliedIdentifier(db: Database) throws {
+    private func insertAppliedIdentifier(_ db: Database) throws {
         try db.execute("INSERT INTO grdb_migrations (identifier) VALUES (?)", arguments: [identifier])
     }
 }

@@ -9,18 +9,18 @@ import XCTest
 
 struct DatabaseTimestamp: DatabaseValueConvertible {
     
-    // NSDate conversion
+    // Date conversion
     //
     // We consistently use the Swift nil to represent the database NULL: the
-    // date property is a non-optional NSDate, and the NSDate initializer is
+    // date property is a non-optional Date, and the Date initializer is
     // failable:
     
     /// The represented date
-    let date: NSDate
+    let date: Date
     
-    /// Creates a DatabaseTimestamp from an NSDate.
+    /// Creates a DatabaseTimestamp from an Date.
     /// The result is nil if and only if *date* is nil.
-    init?(_ date: NSDate?) {
+    init?(_ date: Date?) {
         guard let date = date else {
             return nil
         }
@@ -36,14 +36,14 @@ struct DatabaseTimestamp: DatabaseValueConvertible {
     }
     
     /// Returns a value initialized from *databaseValue*, if possible.
-    static func fromDatabaseValue(databaseValue: DatabaseValue) -> DatabaseTimestamp? {
+    static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> DatabaseTimestamp? {
         // Double itself adopts DatabaseValueConvertible. So let's avoid
         // handling the raw DatabaseValue, and use built-in Double conversion:
         guard let timeInterval = Double.fromDatabaseValue(databaseValue) else {
-            // No Double, no NSDate!
+            // No Double, no Date!
             return nil
         }
-        return DatabaseTimestamp(NSDate(timeIntervalSince1970: timeInterval))
+        return DatabaseTimestamp(Date(timeIntervalSince1970: timeInterval))
     }
 }
 
@@ -55,10 +55,10 @@ class DatabaseTimestampTests: GRDBTestCase {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE dates (date DATETIME)")
-                let storedDate = NSDate()
+                let storedDate = Date()
                 try db.execute("INSERT INTO dates (date) VALUES (?)", arguments: [DatabaseTimestamp(storedDate)])
                 let fetchedDate = DatabaseTimestamp.fetchOne(db, "SELECT date FROM dates")!.date
-                let delta = storedDate.timeIntervalSinceDate(fetchedDate)
+                let delta = storedDate.timeIntervalSince(fetchedDate)
                 XCTAssertTrue(abs(delta) < 0.1)
             }
         }

@@ -7,11 +7,17 @@
         #else
             import SQLiteiPhoneOS
         #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
+        #endif
     #endif
 #endif
 
 /// DatabaseError wraps an SQLite error.
-public struct DatabaseError : ErrorType {
+public struct DatabaseError : Error {
     
     /// The SQLite error code (see https://www.sqlite.org/c3ref/c_abort.html).
     public let code: Int32
@@ -44,7 +50,7 @@ extension DatabaseError: CustomStringConvertible {
         if let sql = sql {
             description += " with statement `\(sql)`"
         }
-        if let arguments = arguments where !arguments.isEmpty {
+        if let arguments = arguments, !arguments.isEmpty {
             description += " arguments \(arguments)"
         }
         if let message = message {

@@ -11,9 +11,9 @@ private class Person : Record {
     var id: Int64!
     var name: String!
     var age: Int?
-    var creationDate: NSDate!
+    var creationDate: Date!
     
-    init(id: Int64? = nil, name: String? = nil, age: Int? = nil, creationDate: NSDate? = nil) {
+    init(id: Int64? = nil, name: String? = nil, age: Int? = nil, creationDate: Date? = nil) {
         self.id = id
         self.name = name
         self.age = age
@@ -21,7 +21,7 @@ private class Person : Record {
         super.init()
     }
     
-    static func setupInDatabase(db: Database) throws {
+    static func setup(inDatabase db: Database) throws {
         try db.execute(
             "CREATE TABLE persons (" +
                 "id INTEGER PRIMARY KEY, " +
@@ -33,16 +33,16 @@ private class Person : Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "persons"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         id = row.value(named: "id")
         age = row.value(named: "age")
         name = row.value(named: "name")
         creationDate = row.value(named: "creationDate")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -54,16 +54,16 @@ private class Person : Record {
         ]
     }
     
-    override func insert(db: Database) throws {
+    override func insert(_ db: Database) throws {
         // This is implicitely tested with the NOT NULL constraint on creationDate
         if creationDate == nil {
-            creationDate = NSDate()
+            creationDate = Date()
         }
         
         try super.insert(db)
     }
     
-    override func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    override func didInsert(with rowID: Int64, for column: String?) {
         self.id = rowID
     }
 }
@@ -78,9 +78,9 @@ private class IntegerPropertyOnRealAffinityColumn : Record {
     
     // Record
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         value = row.value(named: "value")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -92,9 +92,9 @@ private class PersonWithModifiedCaseColumns: Record {
     var id: Int64!
     var name: String!
     var age: Int?
-    var creationDate: NSDate!
+    var creationDate: Date!
     
-    init(id: Int64? = nil, name: String? = nil, age: Int? = nil, creationDate: NSDate? = nil) {
+    init(id: Int64? = nil, name: String? = nil, age: Int? = nil, creationDate: Date? = nil) {
         self.id = id
         self.name = name
         self.age = age
@@ -104,16 +104,16 @@ private class PersonWithModifiedCaseColumns: Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "persons"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         id = row.value(named: "ID")
         age = row.value(named: "AGE")
         name = row.value(named: "NAME")
         creationDate = row.value(named: "CREATIONDATE")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -125,25 +125,25 @@ private class PersonWithModifiedCaseColumns: Record {
         ]
     }
     
-    override func insert(db: Database) throws {
+    override func insert(_ db: Database) throws {
         // This is implicitely tested with the NOT NULL constraint on creationDate
         if creationDate == nil {
-            creationDate = NSDate()
+            creationDate = Date()
         }
         
         try super.insert(db)
     }
     
-    override func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    override func didInsert(with rowID: Int64, for column: String?) {
         self.id = rowID
     }
 }
 
 class RecordEditedTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
-        migrator.registerMigration("createPerson", migrate: Person.setupInDatabase)
+        migrator.registerMigration("createPerson", migrate: Person.setup)
         try migrator.migrate(dbWriter)
     }
     
@@ -159,7 +159,7 @@ class RecordEditedTests: GRDBTestCase {
         // Create a Record from a row. The row may not come from the database.
         // So it is edited.
         let row = Row(["name": "Arthur", "age": 41])
-        let person = Person(row)
+        let person = Person(row: row)
         XCTAssertTrue(person.hasPersistentChangedValues)
     }
     
@@ -192,8 +192,8 @@ class RecordEditedTests: GRDBTestCase {
                 
                 // Load a double...
                 let row1 = Row.fetchOne(db, "SELECT * FROM t")!
-                switch row1.databaseValue(named: "value")!.storage {
-                case .Double(let double):
+                switch (row1.value(named: "value") as DatabaseValue).storage {
+                case .double(let double):
                     XCTAssertEqual(double, 1.0)
                 default:
                     XCTFail("Unexpected DatabaseValue")
@@ -202,8 +202,8 @@ class RecordEditedTests: GRDBTestCase {
                 // Compare to an Int
                 let record = IntegerPropertyOnRealAffinityColumn.fetchOne(db, "SELECT * FROM t")!
                 let row2 = Row(record.persistentDictionary)
-                switch row2.databaseValue(named: "value")!.storage {
-                case .Int64(let int64):
+                switch (row2.value(named: "value") as DatabaseValue).storage {
+                case .int64(let int64):
                     XCTAssertEqual(int64, 1)
                 default:
                     XCTFail("Unexpected DatabaseValue")
@@ -493,7 +493,7 @@ class RecordEditedTests: GRDBTestCase {
     }
     
     func testChangesAfterInitFromRow() {
-        let person = Person(Row(["name": "Arthur", "age": 41]))
+        let person = Person(row: Row(["name": "Arthur", "age": 41]))
         let changes = person.persistentChangedValues
         XCTAssertEqual(changes.count, 4)
         for (column, old) in changes {
@@ -618,9 +618,9 @@ class RecordEditedTests: GRDBTestCase {
                     case "name":
                         XCTAssertEqual(old, "Arthur".databaseValue)
                     case "age":
-                        XCTAssertEqual(old, DatabaseValue.Null)
+                        XCTAssertEqual(old, DatabaseValue.null)
                     case "creationDate":
-                        XCTAssertTrue((old?.value() as NSDate?) != nil)
+                        XCTAssertTrue((old?.value() as Date?) != nil)
                     default:
                         XCTFail("Unexpected column: \(column)")
                     }
@@ -640,9 +640,9 @@ class RecordEditedTests: GRDBTestCase {
                     case "NAME":
                         XCTAssertEqual(old, "Arthur".databaseValue)
                     case "AGE":
-                        XCTAssertEqual(old, DatabaseValue.Null)
+                        XCTAssertEqual(old, DatabaseValue.null)
                     case "CREATIONDATE":
-                        XCTAssertTrue((old?.value() as NSDate?) != nil)
+                        XCTAssertTrue((old?.value() as Date?) != nil)
                     default:
                         XCTFail("Unexpected column: \(column)")
                     }

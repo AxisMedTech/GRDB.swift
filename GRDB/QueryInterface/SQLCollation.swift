@@ -7,57 +7,53 @@ public struct _SQLCollatedExpression {
     let collationName: String
 }
 
-extension _SQLCollatedExpression : _SQLExpressible {
+extension _SQLCollatedExpression : SQLExpressible {
     
     /// This property is an implementation detail of the query interface.
     /// Do not use it directly.
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
     public var sqlExpression: _SQLExpression {
-        return .Collate(baseExpression, collationName)
+        return .collate(baseExpression, collationName)
     }
 }
 
-extension _SQLCollatedExpression : _SQLOrdering {
+extension _SQLCollatedExpression : _SQLOrderable {
     
     /// This property is an implementation detail of the query interface.
     /// Do not use it directly.
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
-    public var reversedSortDescriptor: _SQLSortDescriptor {
-        return .Desc(sqlExpression)
+    public var reversedOrdering: _SQLOrderingExpression {
+        return .desc(sqlExpression)
     }
     
     /// Returns a value that can be used as an argument to FetchRequest.order()
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
-    public var asc: _SQLSortDescriptor {
-        return .Asc(sqlExpression)
+    public var asc: _SQLOrderingExpression {
+        return .asc(sqlExpression)
     }
     
     /// Returns a value that can be used as an argument to FetchRequest.order()
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
-    public var desc: _SQLSortDescriptor {
-        return .Desc(sqlExpression)
+    public var desc: _SQLOrderingExpression {
+        return .desc(sqlExpression)
     }
     
     /// This method is an implementation detail of the query interface.
     /// Do not use it directly.
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
-    public func orderingSQL(db: Database, inout _ arguments: StatementArguments) throws -> String {
-        return try sqlExpression.orderingSQL(db, &arguments)
+    public func orderingSQL(_ arguments: inout StatementArguments?) -> String {
+        return sqlExpression.orderingSQL(&arguments)
     }
 }
 
 extension _SpecificSQLExpressible {
     
-    /// This method is an implementation detail of the query interface.
-    /// Do not use it directly.
-    ///
-    /// See https://github.com/groue/GRDB.swift/#the-query-interface
-    public func collating(collationName: String) -> _SQLCollatedExpression {
+    public func collating(_ collationName: String) -> _SQLCollatedExpression {
         return _SQLCollatedExpression(baseExpression: sqlExpression, collationName: collationName)
     }
     
@@ -65,7 +61,15 @@ extension _SpecificSQLExpressible {
     /// Do not use it directly.
     ///
     /// See https://github.com/groue/GRDB.swift/#the-query-interface
-    public func collating(collation: DatabaseCollation) -> _SQLCollatedExpression {
+    public func collating(_ collation: SQLCollation) -> _SQLCollatedExpression {
+        return collating(collation.rawValue)
+    }
+    
+    /// This method is an implementation detail of the query interface.
+    /// Do not use it directly.
+    ///
+    /// See https://github.com/groue/GRDB.swift/#the-query-interface
+    public func collating(_ collation: DatabaseCollation) -> _SQLCollatedExpression {
         return collating(collation.name)
     }
 }
@@ -76,15 +80,15 @@ extension _SpecificSQLExpressible {
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func == (lhs: _SQLCollatedExpression, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .Collate(lhs.baseExpression == rhs, lhs.collationName)
+public func == (lhs: _SQLCollatedExpression, rhs: SQLExpressible?) -> _SQLExpression {
+    return .collate(lhs.baseExpression == rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func == (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs == rhs.baseExpression, rhs.collationName)
+public func == (lhs: SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs == rhs.baseExpression, rhs.collationName)
 }
 
 
@@ -93,15 +97,15 @@ public func == (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpre
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func != (lhs: _SQLCollatedExpression, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .Collate(lhs.baseExpression != rhs, lhs.collationName)
+public func != (lhs: _SQLCollatedExpression, rhs: SQLExpressible?) -> _SQLExpression {
+    return .collate(lhs.baseExpression != rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func != (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs != rhs.baseExpression, rhs.collationName)
+public func != (lhs: SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs != rhs.baseExpression, rhs.collationName)
 }
 
 
@@ -110,15 +114,15 @@ public func != (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpre
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func < (lhs: _SQLCollatedExpression, rhs: _SQLExpressible) -> _SQLExpression {
-    return .Collate(lhs.baseExpression < rhs, lhs.collationName)
+public func < (lhs: _SQLCollatedExpression, rhs: SQLExpressible) -> _SQLExpression {
+    return .collate(lhs.baseExpression < rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func < (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs < rhs.baseExpression, rhs.collationName)
+public func < (lhs: SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs < rhs.baseExpression, rhs.collationName)
 }
 
 
@@ -127,15 +131,15 @@ public func < (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpress
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func <= (lhs: _SQLCollatedExpression, rhs: _SQLExpressible) -> _SQLExpression {
-    return .Collate(lhs.baseExpression <= rhs, lhs.collationName)
+public func <= (lhs: _SQLCollatedExpression, rhs: SQLExpressible) -> _SQLExpression {
+    return .collate(lhs.baseExpression <= rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func <= (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs <= rhs.baseExpression, rhs.collationName)
+public func <= (lhs: SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs <= rhs.baseExpression, rhs.collationName)
 }
 
 
@@ -144,15 +148,15 @@ public func <= (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpres
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func > (lhs: _SQLCollatedExpression, rhs: _SQLExpressible) -> _SQLExpression {
-    return .Collate(lhs.baseExpression > rhs, lhs.collationName)
+public func > (lhs: _SQLCollatedExpression, rhs: SQLExpressible) -> _SQLExpression {
+    return .collate(lhs.baseExpression > rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func > (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs > rhs.baseExpression, rhs.collationName)
+public func > (lhs: SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs > rhs.baseExpression, rhs.collationName)
 }
 
 
@@ -161,50 +165,50 @@ public func > (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpress
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func >= (lhs: _SQLCollatedExpression, rhs: _SQLExpressible) -> _SQLExpression {
-    return .Collate(lhs.baseExpression >= rhs, lhs.collationName)
+public func >= (lhs: _SQLCollatedExpression, rhs: SQLExpressible) -> _SQLExpression {
+    return .collate(lhs.baseExpression >= rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func >= (lhs: _SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs >= rhs.baseExpression, rhs.collationName)
+public func >= (lhs: SQLExpressible, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs >= rhs.baseExpression, rhs.collationName)
 }
 
 
 // MARK: - Operator BETWEEN COLLATE
 
-extension ClosedInterval where Bound: _SQLExpressible {
+extension Range where Bound: SQLExpressible {
     /// Returns an SQL expression that compares the inclusion of a value in
-    /// an interval.
+    /// a range.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SQLCollatedExpression) -> _SQLExpression {
-        return .Collate(contains(element.baseExpression), element.collationName)
+    public func contains(_ element: _SQLCollatedExpression) -> _SQLExpression {
+        return (element >= lowerBound) && (element < upperBound)
     }
 }
 
-extension HalfOpenInterval where Bound: _SQLExpressible {
+extension ClosedRange where Bound: SQLExpressible {
     /// Returns an SQL expression that compares the inclusion of a value in
-    /// an interval.
+    /// a range.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SQLCollatedExpression) -> _SQLExpression {
-        return (element >= start) && (element < end)
+    public func contains(_ element: _SQLCollatedExpression) -> _SQLExpression {
+        return .collate(contains(element.baseExpression), element.collationName)
     }
 }
 
 
 // MARK: - Operator IN COLLATE
 
-extension SequenceType where Self.Generator.Element: _SQLExpressible {
+extension Sequence where Self.Iterator.Element: SQLExpressible {
     /// Returns an SQL expression that compares the inclusion of a value in
     /// a sequence.
     ///
     /// See https://github.com/groue/GRDB.swift/#sql-operators
-    public func contains(element: _SQLCollatedExpression) -> _SQLExpression {
-        return .Collate(contains(element.baseExpression), element.collationName)
+    public func contains(_ element: _SQLCollatedExpression) -> _SQLExpression {
+        return .collate(contains(element.baseExpression), element.collationName)
     }
 }
 
@@ -214,15 +218,15 @@ extension SequenceType where Self.Generator.Element: _SQLExpressible {
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func === (lhs: _SQLCollatedExpression, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .Collate(lhs.baseExpression === rhs, lhs.collationName)
+public func === (lhs: _SQLCollatedExpression, rhs: SQLExpressible?) -> _SQLExpression {
+    return .collate(lhs.baseExpression === rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func === (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs == rhs.baseExpression, rhs.collationName)
+public func === (lhs: SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs == rhs.baseExpression, rhs.collationName)
 }
 
 
@@ -231,13 +235,13 @@ public func === (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpr
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func !== (lhs: _SQLCollatedExpression, rhs: _SQLExpressible?) -> _SQLExpression {
-    return .Collate(lhs.baseExpression !== rhs, lhs.collationName)
+public func !== (lhs: _SQLCollatedExpression, rhs: SQLExpressible?) -> _SQLExpression {
+    return .collate(lhs.baseExpression !== rhs, lhs.collationName)
 }
 
 /// Returns an SQL expression that compares two values.
 ///
 /// See https://github.com/groue/GRDB.swift/#sql-operators
-public func !== (lhs: _SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
-    return .Collate(lhs !== rhs.baseExpression, rhs.collationName)
+public func !== (lhs: SQLExpressible?, rhs: _SQLCollatedExpression) -> _SQLExpression {
+    return .collate(lhs !== rhs.baseExpression, rhs.collationName)
 }

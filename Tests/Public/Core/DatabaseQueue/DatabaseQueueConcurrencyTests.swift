@@ -8,22 +8,22 @@ import XCTest
 #endif
 
 class ConcurrencyTests: GRDBTestCase {
-    var busyCallback: BusyCallback?
+    var busyCallback: Database.BusyCallback?
     
     override func setUp() {
         super.setUp()
         
         self.busyCallback = nil
-        let busyCallback: BusyCallback = { numberOfTries in
+        let busyCallback: Database.BusyCallback = { numberOfTries in
             if let busyCallback = self.busyCallback {
-                return busyCallback(numberOfTries: numberOfTries)
+                return busyCallback(numberOfTries)
             } else {
                 // Default give up
                 return false
             }
         }
         
-        dbConfiguration.busyMode = .Callback(busyCallback)
+        dbConfiguration.busyMode = .callback(busyCallback)
     }
     
     func testWrappedReadWrite() {
@@ -55,33 +55,33 @@ class ConcurrencyTests: GRDBTestCase {
             
             // Queue 1                              Queue 2
             // BEGIN DEFERRED TRANSACTION
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             //                                      BEGIN DEFERRED TRANSACTION
-            let s2 = dispatch_semaphore_create(0)
+            let s2 = DispatchSemaphore(value: 0)
             // INSERT INTO stuffs (id) VALUES (NULL)
-            let s3 = dispatch_semaphore_create(0)
+            let s3 = DispatchSemaphore(value: 0)
             //                                      INSERT INTO stuffs (id) VALUES (NULL) <--- Error
             //                                      ROLLBACK
-            let s4 = dispatch_semaphore_create(0)
+            let s4 = DispatchSemaphore(value: 0)
             // COMMIT
             
             try! dbQueue1.inDatabase { db in
                 try db.execute("CREATE TABLE stuffs (id INTEGER PRIMARY KEY)")
             }
             
-            let queue = dispatch_queue_create("GRDB", DISPATCH_QUEUE_CONCURRENT)
-            let group = dispatch_group_create()
+            let queue = DispatchQueue(label: "GRDB", attributes: [.concurrent])
+            let group = DispatchGroup()
             
             // Queue 1
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    try dbQueue1.inTransaction(.Deferred) { db in
-                        dispatch_semaphore_signal(s1)
-                        dispatch_semaphore_wait(s2, DISPATCH_TIME_FOREVER)
+                    try dbQueue1.inTransaction(.deferred) { db in
+                        s1.signal()
+                        _ = s2.wait(timeout: .distantFuture)
                         try db.execute("INSERT INTO stuffs (id) VALUES (NULL)")
-                        dispatch_semaphore_signal(s3)
-                        dispatch_semaphore_wait(s4, DISPATCH_TIME_FOREVER)
-                        return .Commit
+                        s3.signal()
+                        _ = s4.wait(timeout: .distantFuture)
+                        return .commit
                     }
                 }
                 catch {
@@ -91,18 +91,18 @@ class ConcurrencyTests: GRDBTestCase {
 
             // Queue 2
             var concurrencyError: DatabaseError? = nil
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
-                    try dbQueue2.inTransaction(.Deferred) { db in
-                        dispatch_semaphore_signal(s2)
-                        dispatch_semaphore_wait(s3, DISPATCH_TIME_FOREVER)
+                    _ = s1.wait(timeout: .distantFuture)
+                    try dbQueue2.inTransaction(.deferred) { db in
+                        s2.signal()
+                        _ = s3.wait(timeout: .distantFuture)
                         try db.execute("INSERT INTO stuffs (id) VALUES (NULL)")
-                        return .Commit
+                        return .commit
                     }
                 }
                 catch let error as DatabaseError {
-                    dispatch_semaphore_signal(s4)
+                    s4.signal()
                     concurrencyError = error
                 }
                 catch {
@@ -110,7 +110,7 @@ class ConcurrencyTests: GRDBTestCase {
                 }
             }
             
-            dispatch_group_wait(group, DISPATCH_TIME_FOREVER)
+            _ = group.wait(timeout: .distantFuture)
             
             if let concurrencyError = concurrencyError {
                 XCTAssertEqual(concurrencyError.code, 5) // SQLITE_BUSY
@@ -128,21 +128,21 @@ class ConcurrencyTests: GRDBTestCase {
             
             // Queue 1                              Queue 2
             // BEGIN EXCLUSIVE TRANSACTION
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             //                                      BEGIN EXCLUSIVE TRANSACTION <--- Error
-            let s2 = dispatch_semaphore_create(0)
+            let s2 = DispatchSemaphore(value: 0)
             // COMMIT
             
-            let queue = dispatch_queue_create("GRDB", DISPATCH_QUEUE_CONCURRENT)
-            let group = dispatch_group_create()
+            let queue = DispatchQueue(label: "GRDB", attributes: [.concurrent])
+            let group = DispatchGroup()
             
             // Queue 1
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    try dbQueue1.inTransaction(.Exclusive) { db in
-                        dispatch_semaphore_signal(s1)
-                        dispatch_semaphore_wait(s2, DISPATCH_TIME_FOREVER)
-                        return .Commit
+                    try dbQueue1.inTransaction(.exclusive) { db in
+                        s1.signal()
+                        _ = s2.wait(timeout: .distantFuture)
+                        return .commit
                     }
                 }
                 catch {
@@ -152,15 +152,15 @@ class ConcurrencyTests: GRDBTestCase {
             
             // Queue 2
             var concurrencyError: DatabaseError? = nil
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
-                    try dbQueue2.inTransaction(.Exclusive) { db in
-                        return .Commit
+                    _ = s1.wait(timeout: .distantFuture)
+                    try dbQueue2.inTransaction(.exclusive) { db in
+                        return .commit
                     }
                 }
                 catch let error as DatabaseError {
-                    dispatch_semaphore_signal(s2)
+                    s2.signal()
                     concurrencyError = error
                 }
                 catch {
@@ -168,7 +168,7 @@ class ConcurrencyTests: GRDBTestCase {
                 }
             }
             
-            dispatch_group_wait(group, DISPATCH_TIME_FOREVER)
+            _ = group.wait(timeout: .distantFuture)
             
             if let concurrencyError = concurrencyError {
                 XCTAssertEqual(concurrencyError.code, 5) // SQLITE_BUSY
@@ -186,21 +186,21 @@ class ConcurrencyTests: GRDBTestCase {
             
             // Queue 1                              Queue 2
             // BEGIN IMMEDIATE TRANSACTION
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             //                                      BEGIN IMMEDIATE TRANSACTION <--- Error
-            let s2 = dispatch_semaphore_create(0)
+            let s2 = DispatchSemaphore(value: 0)
             // COMMIT
             
-            let queue = dispatch_queue_create("GRDB", DISPATCH_QUEUE_CONCURRENT)
-            let group = dispatch_group_create()
+            let queue = DispatchQueue(label: "GRDB", attributes: [.concurrent])
+            let group = DispatchGroup()
             
             // Queue 1
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    try dbQueue1.inTransaction(.Immediate) { db in
-                        dispatch_semaphore_signal(s1)
-                        dispatch_semaphore_wait(s2, DISPATCH_TIME_FOREVER)
-                        return .Commit
+                    try dbQueue1.inTransaction(.immediate) { db in
+                        s1.signal()
+                        _ = s2.wait(timeout: .distantFuture)
+                        return .commit
                     }
                 }
                 catch {
@@ -210,15 +210,15 @@ class ConcurrencyTests: GRDBTestCase {
             
             // Queue 2
             var concurrencyError: DatabaseError? = nil
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
-                    try dbQueue2.inTransaction(.Immediate) { db in
-                        return .Commit
+                    _ = s1.wait(timeout: .distantFuture)
+                    try dbQueue2.inTransaction(.immediate) { db in
+                        return .commit
                     }
                 }
                 catch let error as DatabaseError {
-                    dispatch_semaphore_signal(s2)
+                    s2.signal()
                     concurrencyError = error
                 }
                 catch {
@@ -226,7 +226,7 @@ class ConcurrencyTests: GRDBTestCase {
                 }
             }
             
-            dispatch_group_wait(group, DISPATCH_TIME_FOREVER)
+            _ = group.wait(timeout: .distantFuture)
             
             if let concurrencyError = concurrencyError {
                 XCTAssertEqual(concurrencyError.code, 5) // SQLITE_BUSY
@@ -252,7 +252,7 @@ class ConcurrencyTests: GRDBTestCase {
             
             // Queue 1                              Queue 2
             // BEGIN EXCLUSIVE TRANSACTION
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             // (Waiting)                            BEGIN EXCLUSIVE TRANSACTION <--- Busy
             // (Waiting)                            BEGIN EXCLUSIVE TRANSACTION <--- Busy
             // (Waiting)                            BEGIN EXCLUSIVE TRANSACTION <--- Busy
@@ -267,16 +267,16 @@ class ConcurrencyTests: GRDBTestCase {
                 return true
             }
             
-            let queue = dispatch_queue_create("GRDB", DISPATCH_QUEUE_CONCURRENT)
-            let group = dispatch_group_create()
+            let queue = DispatchQueue(label: "GRDB", attributes: [.concurrent])
+            let group = DispatchGroup()
             
             // Queue 1
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    try dbQueue1.inTransaction(.Exclusive) { db in
-                        dispatch_semaphore_signal(s1)
+                    try dbQueue1.inTransaction(.exclusive) { db in
+                        s1.signal()
                         usleep(100_000) // 0.1s
-                        return .Commit
+                        return .commit
                     }
                 }
                 catch {
@@ -285,11 +285,11 @@ class ConcurrencyTests: GRDBTestCase {
             }
             
             // Queue 2
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
-                    try dbQueue2.inTransaction(.Exclusive) { db in
-                        return .Commit
+                    _ = s1.wait(timeout: .distantFuture)
+                    try dbQueue2.inTransaction(.exclusive) { db in
+                        return .commit
                     }
                 }
                 catch {
@@ -297,7 +297,7 @@ class ConcurrencyTests: GRDBTestCase {
                 }
             }
             
-            dispatch_group_wait(group, DISPATCH_TIME_FOREVER)
+            _ = group.wait(timeout: .distantFuture)
             
             XCTAssertTrue(numberOfTries > 0)    // Busy handler has been used.
         }
@@ -321,50 +321,50 @@ class ConcurrencyTests: GRDBTestCase {
             // Queue 1                              Queue 2
             // BEGIN IMMEDIATE TRANSACTION
             // INSERT INTO stuffs (id) VALUES (NULL)
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             //                                      SELECT * FROM stuffs <--- 0 result
-            let s2 = dispatch_semaphore_create(0)
+            let s2 = DispatchSemaphore(value: 0)
             // COMMIT
-            let s3 = dispatch_semaphore_create(0)
+            let s3 = DispatchSemaphore(value: 0)
             //                                      SELECT * FROM stuffs <--- 1 result
             
             try! dbQueue1.inDatabase { db in
                 try db.execute("CREATE TABLE stuffs (id INTEGER PRIMARY KEY)")
             }
             
-            let queue = dispatch_queue_create("GRDB", DISPATCH_QUEUE_CONCURRENT)
-            let group = dispatch_group_create()
+            let queue = DispatchQueue(label: "GRDB", attributes: [.concurrent])
+            let group = DispatchGroup()
             
             // Queue 1
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
                     try dbQueue1.inTransaction { db in
                         try db.execute("INSERT INTO stuffs (id) VALUES (NULL)")
-                        dispatch_semaphore_signal(s1)
-                        dispatch_semaphore_wait(s2, DISPATCH_TIME_FOREVER)
-                        return .Commit
+                        s1.signal()
+                        _ = s2.wait(timeout: .distantFuture)
+                        return .commit
                     }
                 }
                 catch {
                     XCTFail("\(error)")
                 }
-                dispatch_semaphore_signal(s3)
+                s3.signal()
             }
             
             // Queue 2
             var rows1: [Row]?
             var rows2: [Row]?
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 dbQueue2.inDatabase { db in
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
+                    _ = s1.wait(timeout: .distantFuture)
                     rows1 = Row.fetchAll(db, "SELECT * FROM stuffs")
-                    dispatch_semaphore_signal(s2)
-                    dispatch_semaphore_wait(s3, DISPATCH_TIME_FOREVER)
+                    s2.signal()
+                    _ = s3.wait(timeout: .distantFuture)
                     rows2 = Row.fetchAll(db, "SELECT * FROM stuffs")
                 }
             }
             
-            dispatch_group_wait(group, DISPATCH_TIME_FOREVER)
+            _ = group.wait(timeout: .distantFuture)
             
             XCTAssertEqual(rows1!.count, 0) // uncommitted changes are not visible
             XCTAssertEqual(rows2!.count, 1) // committed changes are visible
@@ -395,10 +395,10 @@ class ConcurrencyTests: GRDBTestCase {
             // Queue 1                              Queue 2
             // BEGIN IMMEDIATE TRANSACTION
             // INSERT INTO stuffs (id) VALUES (NULL)
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             //                                      BEGIN DEFERRED TRANSACTION
             //                                      SELECT * FROM stuffs
-            let s2 = dispatch_semaphore_create(0)
+            let s2 = DispatchSemaphore(value: 0)
             // COMMIT <--- Busy                     (Waiting)
             // COMMIT <--- Busy                     (Waiting)
             //                                      COMMIT
@@ -415,17 +415,17 @@ class ConcurrencyTests: GRDBTestCase {
                 try db.execute("CREATE TABLE stuffs (id INTEGER PRIMARY KEY)")
             }
             
-            let queue = dispatch_queue_create("GRDB", DISPATCH_QUEUE_CONCURRENT)
-            let group = dispatch_group_create()
+            let queue = DispatchQueue(label: "GRDB", attributes: [.concurrent])
+            let group = DispatchGroup()
             
             // Queue 1
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
                     try dbQueue1.inTransaction { db in
                         try db.execute("INSERT INTO stuffs (id) VALUES (NULL)")
-                        dispatch_semaphore_signal(s1)
-                        dispatch_semaphore_wait(s2, DISPATCH_TIME_FOREVER)
-                        return .Commit
+                        s1.signal()
+                        _ = s2.wait(timeout: .distantFuture)
+                        return .commit
                     }
                 }
                 catch {
@@ -434,14 +434,14 @@ class ConcurrencyTests: GRDBTestCase {
             }
             
             // Queue 2
-            dispatch_group_async(group, queue) {
+            queue.async(group: group) {
                 do {
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
-                    try dbQueue2.inTransaction(.Deferred) { db in
+                    _ = s1.wait(timeout: .distantFuture)
+                    try dbQueue2.inTransaction(.deferred) { db in
                         _ = Row.fetchAll(db, "SELECT * FROM stuffs")
-                        dispatch_semaphore_signal(s2)
+                        s2.signal()
                         usleep(100_000) // 0.1s
-                        return .Commit
+                        return .commit
                     }
                 }
                 catch {
@@ -449,7 +449,7 @@ class ConcurrencyTests: GRDBTestCase {
                 }
             }
             
-            dispatch_group_wait(group, DISPATCH_TIME_FOREVER)
+            _ = group.wait(timeout: .distantFuture)
             
             XCTAssertTrue(numberOfTries > 0)    // Busy handler has been used.
         }

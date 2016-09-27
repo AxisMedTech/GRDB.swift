@@ -8,21 +8,21 @@ import XCTest
 #endif
 
 private struct CustomFetchRequest : FetchRequest {
-    func prepare(db: Database) throws -> (SelectStatement, RowAdapter?) {
-        return try (db.selectStatement("SELECT 1 AS 'produced'"), ColumnMapping(["consumed": "produced"]))
+    func prepare(_ db: Database) throws -> (SelectStatement, RowAdapter?) {
+        return try (db.makeSelectStatement("SELECT 1 AS 'produced'"), ColumnMapping(["consumed": "produced"]))
     }
 }
 
 private struct CustomRecord: RowConvertible {
     let consumed: Int
-    init(_ row: Row) {
+    init(row: Row) {
         consumed = row.value(named: "consumed")
     }
 }
 
 private struct CustomStruct: DatabaseValueConvertible {
     // CustomStruct that *only* conforms to DatabaseValueConvertible, *NOT* StatementColumnConvertible
-    private let number: Int64
+    fileprivate let number: Int64
     
     /// Returns a value that can be stored in the database.
     var databaseValue: DatabaseValue {
@@ -30,7 +30,7 @@ private struct CustomStruct: DatabaseValueConvertible {
     }
     
     /// Returns a String initialized from *databaseValue*, if possible.
-    static func fromDatabaseValue(databaseValue: DatabaseValue) -> CustomStruct? {
+    static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> CustomStruct? {
         guard let number = Int64.fromDatabaseValue(databaseValue) else {
             return nil
         }

@@ -37,45 +37,45 @@ class Person : Record {
     var id: Int64?
     var name: String?
     
-    func updateFromJSON(json: NSDictionary) {
-        id = (json["id"] as? NSNumber)?.longLongValue
+    func update(from json: NSDictionary) {
+        id = (json["id"] as? NSNumber)?.int64Value
         name = json["name"] as? String
     }
     
     // Record overrides
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "persons"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         id = row.value(named: "id")
         name = row.value(named: "name")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
         return ["id": id, "name": name]
     }
     
-    override func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    override func didInsert(with rowID: Int64, for column: String?) {
         id = rowID
     }
 }
 
 
 // Synchronizes the persons table with a JSON payload
-func synchronizePersonsWithJSON(jsonString: String, inDatabase db: Database) throws {
-    let jsonData = jsonString.dataUsingEncoding(NSUTF8StringEncoding)!
-    let json = try NSJSONSerialization.JSONObjectWithData(jsonData, options: []) as! NSDictionary
+func synchronizePersons(with jsonString: String, in db: Database) throws {
+    let jsonData = jsonString.data(using: .utf8)!
+    let json = try JSONSerialization.jsonObject(with: jsonData, options: []) as! NSDictionary
     
     // A support function that extracts an ID from a JSON person.
-    func jsonPersonId(jsonPerson: NSDictionary) -> Int64 {
-        return (jsonPerson["id"] as! NSNumber).longLongValue
+    func jsonPersonId(_ jsonPerson: NSDictionary) -> Int64 {
+        return (jsonPerson["id"] as! NSNumber).int64Value
     }
     
     // Sort JSON persons by id:
-    let jsonPersons = (json["persons"] as! [NSDictionary]).sort {
+    let jsonPersons = (json["persons"] as! [NSDictionary]).sorted {
         return jsonPersonId($0) < jsonPersonId($1)
     }
     
@@ -94,17 +94,17 @@ func synchronizePersonsWithJSON(jsonString: String, inDatabase db: Database) thr
         rightKey: jsonPersonId) // The id of a JSON person
     {
         switch mergeStep {
-        case .Left(let person):
+        case .left(let person):
             // Delete database person without matching JSON person:
             try person.delete(db)
-        case .Right(let jsonPerson):
+        case .right(let jsonPerson):
             // Insert JSON person without matching database person:
             let row = Row(jsonPerson)! // Granted JSON keys are database columns
-            let person = Person(row)
+            let person = Person(row: row)
             try person.insert(db)
-        case .Common(let person, let jsonPerson):
+        case .common(let person, let jsonPerson):
             // Update database person with its JSON counterpart:
-            person.updateFromJSON(jsonPerson)
+            person.update(from: jsonPerson)
             if person.hasPersistentChangedValues {
                 try person.update(db)
             }
@@ -126,8 +126,8 @@ do {
         // INSERT INTO "persons" ("id","name") VALUES (1,'Arthur')
         // INSERT INTO "persons" ("id","name") VALUES (2,'Barbara')
         // INSERT INTO "persons" ("id","name") VALUES (3,'Craig')
-        try synchronizePersonsWithJSON(jsonString, inDatabase: db)
-        return .Commit
+        try synchronizePersons(with: jsonString, in: db)
+        return .commit
     }
 }
 
@@ -145,7 +145,7 @@ do {
         // DELETE FROM "persons" WHERE "id"=1
         // UPDATE "persons" SET "name"='Barbie' WHERE "id"=2
         // INSERT INTO "persons" ("id","name") VALUES (4,'Daniel')
-        try synchronizePersonsWithJSON(jsonString, inDatabase: db)
-        return .Commit
+        try synchronizePersons(with: jsonString, in: db)
+        return .commit
     }
 }

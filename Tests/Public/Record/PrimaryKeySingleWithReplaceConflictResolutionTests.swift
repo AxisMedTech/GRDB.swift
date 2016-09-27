@@ -17,7 +17,7 @@ class Email : Record {
         super.init()
     }
     
-    static func setupInDatabase(db: Database) throws {
+    static func setup(inDatabase db: Database) throws {
         try db.execute(
             "CREATE TABLE emails (" +
                 "email TEXT NOT NULL PRIMARY KEY ON CONFLICT REPLACE, " +
@@ -27,14 +27,14 @@ class Email : Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "emails"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         email = row.value(named: "email")
         label = row.value(named: "label")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -44,9 +44,9 @@ class Email : Record {
 
 class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
-        migrator.registerMigration("createEmail", migrate: Email.setupInDatabase)
+        migrator.registerMigration("createEmail", migrate: Email.setup)
         try migrator.migrate(dbWriter)
     }
     
@@ -80,8 +80,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -103,8 +103,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -125,8 +125,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -146,9 +146,9 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 record.email = "me@domain.com"
                 do {
                     try record.update(db)
-                    XCTFail("Expected PersistenceError.NotFound")
-                } catch PersistenceError.NotFound {
-                    // Expected PersistenceError.NotFound
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
                 }
             }
         }
@@ -165,8 +165,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -185,9 +185,9 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 try record.delete(db)
                 do {
                     try record.update(db)
-                    XCTFail("Expected PersistenceError.NotFound")
-                } catch PersistenceError.NotFound {
-                    // Expected PersistenceError.NotFound
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
                 }
             }
         }
@@ -222,8 +222,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -243,8 +243,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -265,8 +265,8 @@ class PrimaryKeySingleWithReplaceConflictResolutionTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM emails WHERE email = ?", arguments: [record.email])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }

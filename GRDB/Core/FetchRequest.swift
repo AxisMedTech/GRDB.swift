@@ -3,7 +3,7 @@
 public protocol FetchRequest {
     /// A tuple that contains a prepared statement that is ready to be
     /// executed, and an eventual row adapter.
-    func prepare(db: Database) throws -> (SelectStatement, RowAdapter?)
+    func prepare(_ db: Database) throws -> (SelectStatement, RowAdapter?)
 }
 
 
@@ -21,8 +21,8 @@ struct SQLFetchRequest {
 
 
 extension SQLFetchRequest : FetchRequest {
-    func prepare(db: Database) throws -> (SelectStatement, RowAdapter?) {
-        let statement = try db.selectStatement(sql)
+    func prepare(_ db: Database) throws -> (SelectStatement, RowAdapter?) {
+        let statement = try db.makeSelectStatement(sql)
         if let arguments = arguments {
             try statement.setArgumentsWithValidation(arguments)
         }

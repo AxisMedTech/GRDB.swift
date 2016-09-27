@@ -21,12 +21,12 @@ class EmptyRecordWithoutInitializer : Record {
 //        let name: String?
 //    }
 
-// What happens with a mutable property, and init(_ row: Row)?
+// What happens with a mutable property, and init(row: Row)?
 class RecordWithMutablePropertyAndRowInitializer : Record {
     var name: String?
     
-    required init(_ row: Row) {
-        super.init(row)        // super.init(row) is required
+    required init(row: Row) {
+        super.init(row: row)        // super.init(row: row) is required
         self.name = "toto"          // property can be set before or after super.init
     }
 }
@@ -40,8 +40,8 @@ class RecordWithMutablePropertyAndEmptyInitializer : Record {
         self.name = "toto"          // property can be set before or after super.init
     }
     
-    required init(_ row: Row) {       // init(row) is required
-        super.init(row)        // super.init(row) is required
+    required init(row: Row) {       // init(row) is required
+        super.init(row: row)        // super.init(row: row) is required
     }
 }
 
@@ -54,8 +54,8 @@ class RecordWithMutablePropertyAndCustomInitializer : Record {
         super.init()                // super.init() is required
     }
 
-    required init(_ row: Row) {       // init(row) is required
-        super.init(row)        // super.init(row) is required
+    required init(row: Row) {       // init(row) is required
+        super.init(row: row)        // super.init(row: row) is required
     }
 }
 
@@ -63,9 +63,9 @@ class RecordWithMutablePropertyAndCustomInitializer : Record {
 class RecordWithImmutableProperty : Record {
     let initializedFromRow: Bool
     
-    required init(_ row: Row) {       // An initializer is required, and the minimum is init(row)
-        initializedFromRow = true   // property must bet set before super.init(row)
-        super.init(row)        // super.init(row) is required
+    required init(row: Row) {       // An initializer is required, and the minimum is init(row)
+        initializedFromRow = true   // property must bet set before super.init(row: row)
+        super.init(row: row)        // super.init(row: row) is required
     }
 }
 
@@ -74,13 +74,13 @@ class RecordWithPedigree : Record {
     let initializedFromRow: Bool
     
     override init() {
-        initializedFromRow = false  // property must bet set before super.init(row)
+        initializedFromRow = false  // property must bet set before super.init(row: row)
         super.init()                // super.init() is required
     }
     
-    required init(_ row: Row) {       // An initializer is required, and the minimum is init(row)
-        initializedFromRow = true   // property must bet set before super.init(row)
-        super.init(row)        // super.init(row) is required
+    required init(row: Row) {       // An initializer is required, and the minimum is init(row)
+        initializedFromRow = true   // property must bet set before super.init(row: row)
+        super.init(row: row)        // super.init(row: row) is required
     }
 }
 
@@ -89,13 +89,13 @@ class RecordWithImmutablePropertyAndCustomInitializer : Record {
     let initializedFromRow: Bool
     
     init(name: String? = nil) {
-        initializedFromRow = false  // property must bet set before super.init(row)
+        initializedFromRow = false  // property must bet set before super.init(row: row)
         super.init()                // super.init() is required
     }
     
-    required init(_ row: Row) {       // An initializer is required, and the minimum is init(row)
-        initializedFromRow = true   // property must bet set before super.init(row)
-        super.init(row)        // super.init(row) is required
+    required init(row: Row) {       // An initializer is required, and the minimum is init(row)
+        initializedFromRow = true   // property must bet set before super.init(row: row)
+        super.init(row: row)        // super.init(row: row) is required
     }
 }
 
@@ -103,7 +103,7 @@ class RecordInitializersTests : GRDBTestCase {
     
     func testFetchedRecordAreInitializedFromRow() {
         
-        // Here we test that Record.init(_ row: Row) can be overriden independently from Record.init().
+        // Here we test that Record.init(row: Row) can be overriden independently from Record.init().
         // People must be able to perform some initialization work when fetching records from the database.
         
         XCTAssertFalse(RecordWithPedigree().initializedFromRow)

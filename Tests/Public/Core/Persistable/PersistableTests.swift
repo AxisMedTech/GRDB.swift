@@ -11,9 +11,7 @@ private struct PersistablePerson : Persistable {
     var name: String?
     var age: Int?
     
-    static func databaseTableName() -> String {
-        return "persons"
-    }
+    static let databaseTableName = "persons"
     
     var persistentDictionary: [String: DatabaseValueConvertible?] {
         return ["name": name, "age": age]
@@ -31,15 +29,13 @@ private class PersistablePersonClass : Persistable {
         self.age = age
     }
     
-    static func databaseTableName() -> String {
-        return "persons"
-    }
+    static let databaseTableName = "persons"
     
     var persistentDictionary: [String: DatabaseValueConvertible?] {
-        return ["id": id, "name": name, "age": age]
+        return ["ID": id, "naME": name, "Age": age] // various cases
     }
     
-    func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    func didInsert(with rowID: Int64, for column: String?) {
         self.id = rowID
     }
 }
@@ -48,9 +44,7 @@ private struct PersistableCountry : Persistable {
     var isoCode: String
     var name: String
     
-    static func databaseTableName() -> String {
-        return "countries"
-    }
+    static let databaseTableName = "countries"
     
     var persistentDictionary: [String: DatabaseValueConvertible?] {
         return ["isoCode": isoCode, "name": name]
@@ -60,41 +54,39 @@ private struct PersistableCountry : Persistable {
 private struct PersistableCustomizedCountry : Persistable {
     var isoCode: String
     var name: String
-    let willInsert: Void -> Void
-    let willUpdate: Void -> Void
-    let willSave: Void -> Void
-    let willDelete: Void -> Void
-    let willExists: Void -> Void
+    let willInsert: (Void) -> Void
+    let willUpdate: (Void) -> Void
+    let willSave: (Void) -> Void
+    let willDelete: (Void) -> Void
+    let willExists: (Void) -> Void
     
-    static func databaseTableName() -> String {
-        return "countries"
-    }
+    static let databaseTableName = "countries"
     
     var persistentDictionary: [String: DatabaseValueConvertible?] {
         return ["isoCode": isoCode, "name": name]
     }
     
-    func insert(db: Database) throws {
+    func insert(_ db: Database) throws {
         willInsert()
         try performInsert(db)
     }
     
-    func update(db: Database) throws {
+    func update(_ db: Database, columns: Set<String>) throws {
         willUpdate()
-        try performUpdate(db)
+        try performUpdate(db, columns: columns)
     }
     
-    func save(db: Database) throws {
+    func save(_ db: Database) throws {
         willSave()
         try performSave(db)
     }
     
-    func delete(db: Database) throws -> Bool {
+    func delete(_ db: Database) throws -> Bool {
         willDelete()
         return try performDelete(db)
     }
     
-    func exists(db: Database) -> Bool {
+    func exists(_ db: Database) -> Bool {
         willExists()
         return performExists(db)
     }
@@ -104,9 +96,7 @@ private struct Citizenship : Persistable {
     let personID: Int64
     let countryIsoCode: String
     
-    static func databaseTableName() -> String {
-        return "citizenships"
-    }
+    static let databaseTableName = "citizenships"
     
     var persistentDictionary: [String: DatabaseValueConvertible?] {
         return ["countryIsoCode": countryIsoCode, "personID": personID]
@@ -115,7 +105,7 @@ private struct Citizenship : Persistable {
 
 class PersistableTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("setUp") { db in
             try db.execute(
@@ -198,6 +188,10 @@ class PersistableTests: GRDBTestCase {
                 
                 person1.name = "Craig"
                 try person1.update(db)
+                XCTAssertTrue([
+                    "UPDATE \"persons\" SET \"age\"=42, \"name\"='Craig' WHERE \"id\"=1",
+                    "UPDATE \"persons\" SET \"name\"='Craig', \"age\"=42 WHERE \"id\"=1"
+                    ].contains(self.lastSQLQuery))
                 
                 let rows = Row.fetchAll(db, "SELECT * FROM persons ORDER BY id")
                 XCTAssertEqual(rows.count, 2)
@@ -205,6 +199,64 @@ class PersistableTests: GRDBTestCase {
                 XCTAssertEqual(rows[0].value(named: "name") as String, "Craig")
                 XCTAssertEqual(rows[1].value(named: "id") as Int64, person2.id!)
                 XCTAssertEqual(rows[1].value(named: "name") as String, "Barbara")
+            }
+        }
+    }
+    
+    func testPartialUpdatePersistablePersonClass() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                let person1 = PersistablePersonClass(id: nil, name: "Arthur", age: 24)
+                try person1.insert(db)
+                let person2 = PersistablePersonClass(id: nil, name: "Barbara", age: 36)
+                try person2.insert(db)
+                
+                do {
+                    person1.name = "Craig"
+                    try person1.update(db, columns: [String]())
+                    XCTAssertEqual(self.lastSQLQuery, "UPDATE \"persons\" SET \"id\"=1 WHERE \"id\"=1")
+                    
+                    let rows = Row.fetchAll(db, "SELECT * FROM persons ORDER BY id")
+                    XCTAssertEqual(rows.count, 2)
+                    XCTAssertEqual(rows[0].value(named: "id") as Int64, person1.id!)
+                    XCTAssertEqual(rows[0].value(named: "name") as String, "Arthur")
+                    XCTAssertEqual(rows[0].value(named: "age") as Int, 24)
+                    XCTAssertEqual(rows[1].value(named: "id") as Int64, person2.id!)
+                    XCTAssertEqual(rows[1].value(named: "name") as String, "Barbara")
+                    XCTAssertEqual(rows[1].value(named: "age") as Int, 36)
+                }
+                
+                do {
+                    person1.name = "Craig"
+                    person1.age = 25
+                    try person1.update(db, columns: [Column("name")])
+                    XCTAssertEqual(self.lastSQLQuery, "UPDATE \"persons\" SET \"name\"='Craig' WHERE \"id\"=1")
+                    
+                    let rows = Row.fetchAll(db, "SELECT * FROM persons ORDER BY id")
+                    XCTAssertEqual(rows.count, 2)
+                    XCTAssertEqual(rows[0].value(named: "id") as Int64, person1.id!)
+                    XCTAssertEqual(rows[0].value(named: "name") as String, "Craig")
+                    XCTAssertEqual(rows[0].value(named: "age") as Int, 24)
+                    XCTAssertEqual(rows[1].value(named: "id") as Int64, person2.id!)
+                    XCTAssertEqual(rows[1].value(named: "name") as String, "Barbara")
+                    XCTAssertEqual(rows[1].value(named: "age") as Int, 36)
+                }
+                
+                do {
+                    person1.name = "David"
+                    try person1.update(db, columns: ["AgE"])    // case insensitivity
+                    XCTAssertEqual(self.lastSQLQuery, "UPDATE \"persons\" SET \"AgE\"=25 WHERE \"id\"=1")
+                    
+                    let rows = Row.fetchAll(db, "SELECT * FROM persons ORDER BY id")
+                    XCTAssertEqual(rows.count, 2)
+                    XCTAssertEqual(rows[0].value(named: "id") as Int64, person1.id!)
+                    XCTAssertEqual(rows[0].value(named: "name") as String, "Craig")
+                    XCTAssertEqual(rows[0].value(named: "age") as Int, 25)
+                    XCTAssertEqual(rows[1].value(named: "id") as Int64, person2.id!)
+                    XCTAssertEqual(rows[1].value(named: "name") as String, "Barbara")
+                    XCTAssertEqual(rows[1].value(named: "age") as Int, 36)
+                }
             }
         }
     }
@@ -311,6 +363,7 @@ class PersistableTests: GRDBTestCase {
                 
                 country1.name = "France Métropolitaine"
                 try country1.update(db)
+                XCTAssertEqual(self.lastSQLQuery, "UPDATE \"countries\" SET \"name\"='France Métropolitaine' WHERE \"isoCode\"='FR'")
                 
                 let rows = Row.fetchAll(db, "SELECT * FROM countries ORDER BY isoCode")
                 XCTAssertEqual(rows.count, 2)
@@ -318,6 +371,44 @@ class PersistableTests: GRDBTestCase {
                 XCTAssertEqual(rows[0].value(named: "name") as String, "France Métropolitaine")
                 XCTAssertEqual(rows[1].value(named: "isoCode") as String, "US")
                 XCTAssertEqual(rows[1].value(named: "name") as String, "United States")
+            }
+        }
+    }
+    
+    func testPartialUpdatePersistableCountry() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                var country1 = PersistableCountry(isoCode: "FR", name: "France")
+                try country1.insert(db)
+                let country2 = PersistableCountry(isoCode: "US", name: "United States")
+                try country2.insert(db)
+                
+                do {
+                    country1.name = "France Métropolitaine"
+                    try country1.update(db, columns: [String]())
+                    XCTAssertEqual(self.lastSQLQuery, "UPDATE \"countries\" SET \"isoCode\"='FR' WHERE \"isoCode\"='FR'")
+                    
+                    let rows = Row.fetchAll(db, "SELECT * FROM countries ORDER BY isoCode")
+                    XCTAssertEqual(rows.count, 2)
+                    XCTAssertEqual(rows[0].value(named: "isoCode") as String, "FR")
+                    XCTAssertEqual(rows[0].value(named: "name") as String, "France")
+                    XCTAssertEqual(rows[1].value(named: "isoCode") as String, "US")
+                    XCTAssertEqual(rows[1].value(named: "name") as String, "United States")
+                }
+                
+                do {
+                    country1.name = "France Métropolitaine"
+                    try country1.update(db, columns: [Column("name")])
+                    XCTAssertEqual(self.lastSQLQuery, "UPDATE \"countries\" SET \"name\"='France Métropolitaine' WHERE \"isoCode\"='FR'")
+                    
+                    let rows = Row.fetchAll(db, "SELECT * FROM countries ORDER BY isoCode")
+                    XCTAssertEqual(rows.count, 2)
+                    XCTAssertEqual(rows[0].value(named: "isoCode") as String, "FR")
+                    XCTAssertEqual(rows[0].value(named: "name") as String, "France Métropolitaine")
+                    XCTAssertEqual(rows[1].value(named: "isoCode") as String, "US")
+                    XCTAssertEqual(rows[1].value(named: "name") as String, "United States")
+                }
             }
         }
     }
@@ -461,6 +552,55 @@ class PersistableTests: GRDBTestCase {
                 
                 country1.name = "France Métropolitaine"
                 try country1.update(db)
+                XCTAssertEqual(self.lastSQLQuery, "UPDATE \"countries\" SET \"name\"='France Métropolitaine' WHERE \"isoCode\"='FR'")
+                
+                XCTAssertEqual(insertCount, 1)
+                XCTAssertEqual(updateCount, 1)
+                XCTAssertEqual(saveCount, 0)
+                XCTAssertEqual(deleteCount, 0)
+                XCTAssertEqual(existsCount, 0)
+                
+                let rows = Row.fetchAll(db, "SELECT * FROM countries ORDER BY isoCode")
+                XCTAssertEqual(rows.count, 2)
+                XCTAssertEqual(rows[0].value(named: "isoCode") as String, "FR")
+                XCTAssertEqual(rows[0].value(named: "name") as String, "France Métropolitaine")
+                XCTAssertEqual(rows[1].value(named: "isoCode") as String, "US")
+                XCTAssertEqual(rows[1].value(named: "name") as String, "United States")
+            }
+        }
+    }
+    
+    func testPartialUpdatePersistableCustomizedCountry() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                var insertCount: Int = 0
+                var updateCount: Int = 0
+                var saveCount: Int = 0
+                var deleteCount: Int = 0
+                var existsCount: Int = 0
+                var country1 = PersistableCustomizedCountry(
+                    isoCode: "FR",
+                    name: "France",
+                    willInsert: { insertCount += 1 },
+                    willUpdate: { updateCount += 1 },
+                    willSave: { saveCount += 1 },
+                    willDelete: { deleteCount += 1 },
+                    willExists: { existsCount += 1 })
+                try country1.insert(db)
+                let country2 = PersistableCustomizedCountry(
+                    isoCode: "US",
+                    name: "United States",
+                    willInsert: { },
+                    willUpdate: { },
+                    willSave: { },
+                    willDelete: { },
+                    willExists: { })
+                try country2.insert(db)
+                
+                country1.name = "France Métropolitaine"
+                try country1.update(db, columns: ["name"])
+                XCTAssertEqual(self.lastSQLQuery, "UPDATE \"countries\" SET \"name\"='France Métropolitaine' WHERE \"isoCode\"='FR'")
                 
                 XCTAssertEqual(insertCount, 1)
                 XCTAssertEqual(updateCount, 1)
@@ -534,7 +674,8 @@ class PersistableTests: GRDBTestCase {
                 XCTAssertEqual(rows[1].value(named: "isoCode") as String, "US")
                 XCTAssertEqual(rows[1].value(named: "name") as String, "United States")
                 
-                try country1.delete(db)
+                // TODO: test delete return value
+                _ = try country1.delete(db)
                 try country1.save(db)
                 
                 XCTAssertEqual(insertCount, 2)
@@ -582,7 +723,7 @@ class PersistableTests: GRDBTestCase {
                 try country2.insert(db)
                 
                 // TODO: test delete return value
-                try country1.delete(db)
+                _ = try country1.delete(db)
                 
                 XCTAssertEqual(insertCount, 1)
                 XCTAssertEqual(updateCount, 0)
@@ -624,7 +765,8 @@ class PersistableTests: GRDBTestCase {
                 XCTAssertEqual(deleteCount, 0)
                 XCTAssertEqual(existsCount, 1)
                 
-                try country.delete(db)
+                // TODO: test delete return value
+                _ = try country.delete(db)
                 
                 XCTAssertFalse(country.exists(db))
                 XCTAssertEqual(insertCount, 1)

@@ -9,6 +9,12 @@ import Foundation
         #else
             import SQLiteiPhoneOS
         #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
+        #endif
     #endif
 #endif
 
@@ -57,7 +63,7 @@ public struct Configuration {
     /// GRDB will apply file attributes to all those files.
     ///
     /// Default: nil
-    public var fileAttributes: [String: AnyObject]? = nil
+    public var fileAttributes: [FileAttributeKey: Any]? = nil
     
     
     // MARK: - Transactions
@@ -65,15 +71,15 @@ public struct Configuration {
     /// The default kind of transaction.
     ///
     /// Default: Immediate
-    public var defaultTransactionKind: TransactionKind = .Immediate
+    public var defaultTransactionKind: Database.TransactionKind = .immediate
     
     
     // MARK: - Concurrency
     
     /// The behavior in case of SQLITE_BUSY error. See https://www.sqlite.org/rescode.html#busy
     ///
-    /// Default: ImmediateError
-    public var busyMode: BusyMode = .ImmediateError
+    /// Default: immediateError
+    public var busyMode: Database.BusyMode = .immediateError
     
     /// The maximum number of concurrent readers (applies to database
     /// pools only).
@@ -90,7 +96,7 @@ public struct Configuration {
     
     // MARK: - Not Public
     
-    var threadingMode: ThreadingMode = .Default
+    var threadingMode: Database.ThreadingMode = .`default`
     var SQLiteConnectionDidOpen: (() -> ())?
     var SQLiteConnectionWillClose: ((SQLiteConnection) -> ())?
     var SQLiteConnectionDidClose: (() -> ())?
@@ -101,9 +107,3 @@ public struct Configuration {
 
 /// A tracing function that takes an SQL string.
 public typealias TraceFunction = (String) -> Void
-
-/// A tracing function that logs SQL statements with NSLog
-public func LogSQL(sql: String) {
-    NSLog("SQLite: %@", sql)
-}
-

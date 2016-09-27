@@ -18,7 +18,7 @@ class Pet : Record {
         super.init()
     }
     
-    static func setupInDatabase(db: Database) throws {
+    static func setup(inDatabase db: Database) throws {
         try db.execute(
             "CREATE TABLE pets (" +
                 "UUID TEXT NOT NULL PRIMARY KEY, " +
@@ -28,14 +28,14 @@ class Pet : Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "pets"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         UUID = row.value(named: "UUID")
         name = row.value(named: "name")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -45,9 +45,9 @@ class Pet : Record {
 
 class PrimaryKeySingleTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
-        migrator.registerMigration("createPet", migrate: Pet.setupInDatabase)
+        migrator.registerMigration("createPet", migrate: Pet.setup)
         try migrator.migrate(dbWriter)
     }
     
@@ -79,8 +79,8 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM pets WHERE UUID = ?", arguments: [record.UUID])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -116,8 +116,8 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM pets WHERE UUID = ?", arguments: [record.UUID])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -129,6 +129,21 @@ class PrimaryKeySingleTests: GRDBTestCase {
     
     // MARK: - Update
     
+    func testUpdateWithNilPrimaryKeyThrowsRecordNotFound() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                let record = Pet(UUID: nil, name: "Bobby")
+                do {
+                    try record.update(db)
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
+                }
+            }
+        }
+    }
+    
     func testUpdateWithNotNilPrimaryKeyThatDoesNotMatchAnyRowThrowsRecordNotFound() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
@@ -136,9 +151,9 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 let record = Pet(UUID: "BobbyUUID", name: "Bobby")
                 do {
                     try record.update(db)
-                    XCTFail("Expected PersistenceError.NotFound")
-                } catch PersistenceError.NotFound {
-                    // Expected PersistenceError.NotFound
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
                 }
             }
         }
@@ -155,8 +170,8 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM pets WHERE UUID = ?", arguments: [record.UUID])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -174,9 +189,9 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 try record.delete(db)
                 do {
                     try record.update(db)
-                    XCTFail("Expected PersistenceError.NotFound")
-                } catch PersistenceError.NotFound {
-                    // Expected PersistenceError.NotFound
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
                 }
             }
         }
@@ -210,8 +225,8 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM pets WHERE UUID = ?", arguments: [record.UUID])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -232,8 +247,8 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM pets WHERE UUID = ?", arguments: [record.UUID])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -253,8 +268,8 @@ class PrimaryKeySingleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM pets WHERE UUID = ?", arguments: [record.UUID])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -265,6 +280,17 @@ class PrimaryKeySingleTests: GRDBTestCase {
     
     
     // MARK: - Delete
+    
+    func testDeleteWithNilPrimaryKey() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                let record = Pet(UUID: nil, name: "Bobby")
+                let deleted = try record.delete(db)
+                XCTAssertFalse(deleted)
+            }
+        }
+    }
     
     func testDeleteWithNotNilPrimaryKeyThatDoesNotMatchAnyRowDoesNothing() {
         assertNoError {
@@ -458,6 +484,16 @@ class PrimaryKeySingleTests: GRDBTestCase {
     
     
     // MARK: - Exists
+    
+    func testExistsWithNilPrimaryKeyReturnsFalse() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            dbQueue.inDatabase { db in
+                let record = Pet(UUID: nil, name: "Bobby")
+                XCTAssertFalse(record.exists(db))
+            }
+        }
+    }
     
     func testExistsWithNotNilPrimaryKeyThatDoesNotMatchAnyRowReturnsFalse() {
         assertNoError {

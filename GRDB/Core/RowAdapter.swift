@@ -7,6 +7,12 @@
         #else
             import SQLiteiPhoneOS
         #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
+        #endif
     #endif
 #endif
 
@@ -14,7 +20,7 @@
 public struct ConcreteColumnMapping {
     let columns: [(Int, String)]         // [(baseRowIndex, adaptedColumn), ...]
     let lowercaseColumnIndexes: [String: Int]   // [adaptedColumn: adaptedRowIndex]
-
+    
     /// Creates an ConcreteColumnMapping from an array of (index, name)
     /// pairs. In each pair:
     ///
@@ -39,26 +45,26 @@ public struct ConcreteColumnMapping {
     ///     Row.fetchOne(db, "SELECT NULL, 'foo', 'bar'", adapter: FooBarAdapter())
     public init(columns: [(Int, String)]) {
         self.columns = columns
-        self.lowercaseColumnIndexes = Dictionary(keyValueSequence: columns.enumerate().map { ($1.1.lowercaseString, $0) }.reverse())
+        self.lowercaseColumnIndexes = Dictionary(keyValueSequence: columns.enumerated().map { ($1.1.lowercased(), $0) }.reversed())
     }
-
+    
     var count: Int {
         return columns.count
     }
-
+    
     func baseColumIndex(adaptedIndex index: Int) -> Int {
         return columns[index].0
     }
-
+    
     func columnName(adaptedIndex index: Int) -> String {
         return columns[index].1
     }
-
+    
     func adaptedIndexOfColumn(named name: String) -> Int? {
         if let index = lowercaseColumnIndexes[name] {
             return index
         }
-        return lowercaseColumnIndexes[name.lowercaseString]
+        return lowercaseColumnIndexes[name.lowercased()]
     }
 }
 
@@ -142,7 +148,7 @@ extension RowAdapter {
     ///
     /// - parameter scopes: A dictionary that maps scope names to
     ///   row adapters.
-    public func addingScopes(scopes: [String: RowAdapter]) -> RowAdapter {
+    public func addingScopes(_ scopes: [String: RowAdapter]) -> RowAdapter {
         return ScopeAdapter(mainAdapter: self, scopes: scopes)
     }
 }
@@ -168,12 +174,12 @@ public struct ColumnMapping : RowAdapter {
     public func concreteRowAdapter(with statement: SelectStatement) throws -> ConcreteRowAdapter {
         let columns = try mapping
             .map { (mappedColumn, baseColumn) -> (Int, String) in
-                guard let index = statement.indexOfColumn(named: baseColumn) else {
-                    throw DatabaseError(code: SQLITE_MISUSE, message: "Mapping references missing column \(baseColumn). Valid column names are: \(statement.columnNames.joinWithSeparator(", ")).")
+                guard let index = statement.index(ofColumn: baseColumn) else {
+                    throw DatabaseError(code: SQLITE_MISUSE, message: "Mapping references missing column \(baseColumn). Valid column names are: \(statement.columnNames.joined(separator: ", ")).")
                 }
                 return (index, mappedColumn)
             }
-            .sort { $0.0 < $1.0 }
+            .sorted { $0.0 < $1.0 }
         return ConcreteColumnMapping(columns: columns)
     }
 }
@@ -201,7 +207,7 @@ public struct SuffixRowAdapter : RowAdapter {
     /// Part of the RowAdapter protocol
     public func concreteRowAdapter(with statement: SelectStatement) throws -> ConcreteRowAdapter {
         GRDBPrecondition(index <= statement.columnCount, "Column index is out of range")
-        return ConcreteColumnMapping(columns: statement.columnNames.suffixFrom(index).enumerate().map { ($0 + index, $1) })
+        return ConcreteColumnMapping(columns: statement.columnNames.suffix(from: index).enumerated().map { ($0 + index, $1) })
     }
 }
 
@@ -269,13 +275,13 @@ struct ConcreteScopeAdapter : ConcreteRowAdapter {
 }
 
 extension Row {
-    /// Builds a row from a base row and a statement adapter
+    /// Creates a row from a base row and a statement adapter
     convenience init(baseRow: Row, concreteRowAdapter: ConcreteRowAdapter) {
         self.init(impl: AdapterRowImpl(baseRow: baseRow, concreteRowAdapter: concreteRowAdapter))
     }
 
     /// Returns self if adapter is nil
-    func adaptedRow(adapter adapter: RowAdapter?, statement: SelectStatement) throws -> Row {
+    func adaptedRow(adapter: RowAdapter?, statement: SelectStatement) throws -> Row {
         guard let adapter = adapter else {
             return self
         }
@@ -287,33 +293,33 @@ struct AdapterRowImpl : RowImpl {
     let baseRow: Row
     let concreteRowAdapter: ConcreteRowAdapter
     let concreteColumnMapping: ConcreteColumnMapping
-
+    
     init(baseRow: Row, concreteRowAdapter: ConcreteRowAdapter) {
         self.baseRow = baseRow
         self.concreteRowAdapter = concreteRowAdapter
         self.concreteColumnMapping = concreteRowAdapter.concreteColumnMapping
     }
-
+    
     var count: Int {
         return concreteColumnMapping.count
     }
-
-    func databaseValue(atIndex index: Int) -> DatabaseValue {
-        return baseRow.databaseValue(atIndex: concreteColumnMapping.baseColumIndex(adaptedIndex: index))
+    
+    func databaseValue(atUncheckedIndex index: Int) -> DatabaseValue {
+        return baseRow.value(atIndex: concreteColumnMapping.baseColumIndex(adaptedIndex: index))
     }
-
-    func dataNoCopy(atIndex index:Int) -> NSData? {
+    
+    func dataNoCopy(atUncheckedIndex index:Int) -> Data? {
         return baseRow.dataNoCopy(atIndex: concreteColumnMapping.baseColumIndex(adaptedIndex: index))
     }
-
-    func columnName(atIndex index: Int) -> String {
+    
+    func columnName(atUncheckedIndex index: Int) -> String {
         return concreteColumnMapping.columnName(adaptedIndex: index)
     }
-
-    func indexOfColumn(named name: String) -> Int? {
+    
+    func index(ofColumn name: String) -> Int? {
         return concreteColumnMapping.adaptedIndexOfColumn(named: name)
     }
-
+    
     func scoped(on name: String) -> Row? {
         guard let concreteRowAdapter = concreteRowAdapter.scopes[name] else {
             return nil
@@ -325,7 +331,7 @@ struct AdapterRowImpl : RowImpl {
         return Set(concreteRowAdapter.scopes.keys)
     }
     
-    func copy(row: Row) -> Row {
+    func copy(_ row: Row) -> Row {
         return Row(baseRow: baseRow.copy(), concreteRowAdapter: concreteRowAdapter)
     }
 }

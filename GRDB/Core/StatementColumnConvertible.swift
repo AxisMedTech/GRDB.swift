@@ -7,6 +7,12 @@
         #else
             import SQLiteiPhoneOS
         #endif
+    #elseif os(watchOS)
+        #if (arch(i386) || arch(x86_64))
+            import SQLiteWatchSimulator
+        #else
+            import SQLiteWatchOS
+        #endif
     #endif
 #endif
 
@@ -48,7 +54,7 @@ public extension DatabaseValueConvertible where Self: StatementColumnConvertible
     
     /// Returns a sequence of values fetched from a prepared statement.
     ///
-    ///     let statement = db.selectStatement("SELECT name FROM ...")
+    ///     let statement = db.makeSelectStatement("SELECT name FROM ...")
     ///     let names = String.fetch(statement) // DatabaseSequence<String>
     ///
     /// The returned sequence can be consumed several times, but it may yield
@@ -68,8 +74,7 @@ public extension DatabaseValueConvertible where Self: StatementColumnConvertible
     ///     - arguments: Optional statement arguments.
     ///     - adapter: Optional RowAdapter
     /// - returns: A sequence of values.
-    @warn_unused_result
-    public static func fetch(statement: SelectStatement, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> DatabaseSequence<Self> {
+    public static func fetch(_ statement: SelectStatement, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> DatabaseSequence<Self> {
         if let adapter = adapter {
             let row = try! Row(statement: statement).adaptedRow(adapter: adapter, statement: statement)
             return statement.fetchSequence(arguments: arguments) {
@@ -88,7 +93,7 @@ public extension DatabaseValueConvertible where Self: StatementColumnConvertible
     
     /// Returns an array of values fetched from a prepared statement.
     ///
-    ///     let statement = db.selectStatement("SELECT name FROM ...")
+    ///     let statement = db.makeSelectStatement("SELECT name FROM ...")
     ///     let names = String.fetchAll(statement)  // [String]
     ///
     /// - parameters:
@@ -96,14 +101,13 @@ public extension DatabaseValueConvertible where Self: StatementColumnConvertible
     ///     - arguments: Optional statement arguments.
     ///     - adapter: Optional RowAdapter
     /// - returns: An array of values.
-    @warn_unused_result
-    public static func fetchAll(statement: SelectStatement, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> [Self] {
+    public static func fetchAll(_ statement: SelectStatement, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> [Self] {
         return Array(fetch(statement, arguments: arguments, adapter: adapter))
     }
     
     /// Returns a single value fetched from a prepared statement.
     ///
-    ///     let statement = db.selectStatement("SELECT name FROM ...")
+    ///     let statement = db.makeSelectStatement("SELECT name FROM ...")
     ///     let name = String.fetchOne(statement)   // String?
     ///
     /// - parameters:
@@ -111,14 +115,13 @@ public extension DatabaseValueConvertible where Self: StatementColumnConvertible
     ///     - arguments: Optional statement arguments.
     ///     - adapter: Optional RowAdapter
     /// - returns: An optional value.
-    @warn_unused_result
-    public static func fetchOne(statement: SelectStatement, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> Self? {
+    public static func fetchOne(_ statement: SelectStatement, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> Self? {
         if let adapter = adapter {
             let row = try! Row(statement: statement).adaptedRow(adapter: adapter, statement: statement)
             let sequence = statement.fetchSequence(arguments: arguments) {
                 row.value(atIndex: 0) as Self?
             }
-            if let value = sequence.generate().next() {
+            if let value = sequence.makeIterator().next() {
                 return value
             }
             return nil
@@ -129,7 +132,7 @@ public extension DatabaseValueConvertible where Self: StatementColumnConvertible
                     (nil as Self?) :
                     Self.init(sqliteStatement: sqliteStatement, index: 0)
             }
-            if let value = sequence.generate().next() {
+            if let value = sequence.makeIterator().next() {
                 return value
             }
             return nil
@@ -144,7 +147,7 @@ extension DatabaseValueConvertible where Self: StatementColumnConvertible {
     
     /// Returns a sequence of values fetched from a fetch request.
     ///
-    ///     let nameColumn = SQLColumn("name")
+    ///     let nameColumn = Column("name")
     ///     let request = Person.select(nameColumn)
     ///     let names = String.fetch(db, request) // DatabaseSequence<String>
     ///
@@ -159,21 +162,19 @@ extension DatabaseValueConvertible where Self: StatementColumnConvertible {
     ///
     /// If the database is modified while the sequence is iterating, the
     /// remaining elements are undefined.
-    @warn_unused_result
-    public static func fetch(db: Database, _ request: FetchRequest) -> DatabaseSequence<Self> {
+    public static func fetch(_ db: Database, _ request: FetchRequest) -> DatabaseSequence<Self> {
         let (statement, adapter) = try! request.prepare(db)
         return fetch(statement, adapter: adapter)
     }
     
     /// Returns an array of values fetched from a fetch request.
     ///
-    ///     let nameColumn = SQLColumn("name")
+    ///     let nameColumn = Column("name")
     ///     let request = Person.select(nameColumn)
     ///     let names = String.fetchAll(db, request)  // [String]
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public static func fetchAll(db: Database, _ request: FetchRequest) -> [Self] {
+    public static func fetchAll(_ db: Database, _ request: FetchRequest) -> [Self] {
         let (statement, adapter) = try! request.prepare(db)
         return fetchAll(statement, adapter: adapter)
     }
@@ -183,13 +184,12 @@ extension DatabaseValueConvertible where Self: StatementColumnConvertible {
     /// The result is nil if the query returns no row, or if no value can be
     /// extracted from the first row.
     ///
-    ///     let nameColumn = SQLColumn("name")
+    ///     let nameColumn = Column("name")
     ///     let request = Person.select(nameColumn)
     ///     let name = String.fetchOne(db, request)   // String?
     ///
     /// - parameter db: A database connection.
-    @warn_unused_result
-    public static func fetchOne(db: Database, _ request: FetchRequest) -> Self? {
+    public static func fetchOne(_ db: Database, _ request: FetchRequest) -> Self? {
         let (statement, adapter) = try! request.prepare(db)
         return fetchOne(statement, adapter: adapter)
     }
@@ -222,8 +222,7 @@ extension DatabaseValueConvertible where Self: StatementColumnConvertible {
     ///     - arguments: Optional statement arguments.
     ///     - adapter: Optional RowAdapter
     /// - returns: A sequence of values.
-    @warn_unused_result
-    public static func fetch(db: Database, _ sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> DatabaseSequence<Self> {
+    public static func fetch(_ db: Database, _ sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> DatabaseSequence<Self> {
         return fetch(db, SQLFetchRequest(sql: sql, arguments: arguments, adapter: adapter))
     }
     
@@ -237,8 +236,7 @@ extension DatabaseValueConvertible where Self: StatementColumnConvertible {
     ///     - arguments: Optional statement arguments.
     ///     - adapter: Optional RowAdapter
     /// - returns: An array of values.
-    @warn_unused_result
-    public static func fetchAll(db: Database, _ sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> [Self] {
+    public static func fetchAll(_ db: Database, _ sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> [Self] {
         return fetchAll(db, SQLFetchRequest(sql: sql, arguments: arguments, adapter: adapter))
     }
     
@@ -252,8 +250,7 @@ extension DatabaseValueConvertible where Self: StatementColumnConvertible {
     ///     - arguments: Optional statement arguments.
     ///     - adapter: Optional RowAdapter
     /// - returns: An optional value.
-    @warn_unused_result
-    public static func fetchOne(db: Database, _ sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> Self? {
+    public static func fetchOne(_ db: Database, _ sql: String, arguments: StatementArguments? = nil, adapter: RowAdapter? = nil) -> Self? {
         return fetchOne(db, SQLFetchRequest(sql: sql, arguments: arguments, adapter: adapter))
     }
 }

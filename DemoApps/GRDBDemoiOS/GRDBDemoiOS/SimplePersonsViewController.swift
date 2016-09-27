@@ -8,12 +8,12 @@ class SimplePersonsViewController: UITableViewController {
         super.viewDidLoad()
         
         navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(barButtonSystemItem: .Add, target: self, action: #selector(SimplePersonsViewController.addPerson(_:))),
-            editButtonItem()
+            UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(SimplePersonsViewController.addPerson(_:))),
+            editButtonItem
         ]
     }
     
-    override func viewWillAppear(animated: Bool) {
+    override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         loadPersons()
         tableView.reloadData()
@@ -21,7 +21,7 @@ class SimplePersonsViewController: UITableViewController {
     
     private func loadPersons() {
         persons = dbQueue.inDatabase { db in
-            Person.order(SQLColumn("score").desc, SQLColumn("name")).fetchAll(db)
+            Person.order(Column("score").desc, Column("name")).fetchAll(db)
         }
     }
 }
@@ -31,10 +31,10 @@ class SimplePersonsViewController: UITableViewController {
 
 extension SimplePersonsViewController : PersonEditionViewControllerDelegate {
     
-    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         if segue.identifier == "EditPerson" {
             let person = persons[tableView.indexPathForSelectedRow!.row]
-            let controller = segue.destinationViewController as! PersonEditionViewController
+            let controller = segue.destination as! PersonEditionViewController
             controller.title = person.name
             controller.person = person
             controller.delegate = self // we will save person when back button is tapped
@@ -43,26 +43,26 @@ extension SimplePersonsViewController : PersonEditionViewControllerDelegate {
         }
         else if segue.identifier == "NewPerson" {
             setEditing(false, animated: true)
-            let navigationController = segue.destinationViewController as! UINavigationController
+            let navigationController = segue.destination as! UINavigationController
             let controller = navigationController.viewControllers.first as! PersonEditionViewController
             controller.title = "New Person"
             controller.person = Person(name: "", score: 0)
         }
     }
     
-    @IBAction func addPerson(sender: AnyObject?) {
-        performSegueWithIdentifier("NewPerson", sender: sender)
+    @IBAction func addPerson(_ sender: AnyObject?) {
+        performSegue(withIdentifier: "NewPerson", sender: sender)
     }
     
-    @IBAction func cancelPersonEdition(segue: UIStoryboardSegue) {
+    @IBAction func cancelPersonEdition(_ segue: UIStoryboardSegue) {
         // Person creation: cancel button was tapped
     }
     
-    @IBAction func commitPersonEdition(segue: UIStoryboardSegue) {
+    @IBAction func commitPersonEdition(_ segue: UIStoryboardSegue) {
         // Person creation: commit button was tapped
-        let controller = segue.sourceViewController as! PersonEditionViewController
+        let controller = segue.source as! PersonEditionViewController
         controller.applyChanges()
-        let person = controller.person
+        let person = controller.person!
         if !person.name.isEmpty {
             try! dbQueue.inDatabase { db in
                 try person.save(db)
@@ -70,10 +70,10 @@ extension SimplePersonsViewController : PersonEditionViewControllerDelegate {
         }
     }
     
-    func personEditionControllerDidComplete(controller: PersonEditionViewController) {
+    func personEditionControllerDidComplete(_ controller: PersonEditionViewController) {
         // Person edition: back button was tapped
         controller.applyChanges()
-        let person = controller.person
+        let person = controller.person!
         if !person.name.isEmpty {
             try! dbQueue.inDatabase { db in
                 try person.save(db)
@@ -86,29 +86,29 @@ extension SimplePersonsViewController : PersonEditionViewControllerDelegate {
 // MARK: - UITableViewDataSource
 
 extension SimplePersonsViewController {
-    func configureCell(cell: UITableViewCell, atIndexPath indexPath: NSIndexPath) {
+    func configure(_ cell: UITableViewCell, at indexPath: IndexPath) {
         let person = persons[indexPath.row]
         cell.textLabel?.text = person.name
         cell.detailTextLabel?.text = abs(person.score) > 1 ? "\(person.score) points" : "0 point"
     }
     
-    override func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return persons.count
     }
     
-    override func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCellWithIdentifier("Person", forIndexPath: indexPath)
-        configureCell(cell, atIndexPath: indexPath)
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "Person", for: indexPath)
+        configure(cell, at: indexPath)
         return cell
     }
     
-    override func tableView(tableView: UITableView, commitEditingStyle editingStyle: UITableViewCellEditingStyle, forRowAtIndexPath indexPath: NSIndexPath) {
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         // Delete the person
         let person = persons[indexPath.row]
         try! dbQueue.inDatabase { db in
-            try person.delete(db)
+            _ = try person.delete(db)
         }
-        persons.removeAtIndex(indexPath.row)
-        tableView.deleteRowsAtIndexPaths([indexPath], withRowAnimation: .Fade)
+        persons.remove(at: indexPath.row)
+        tableView.deleteRows(at: [indexPath], with: .fade)
     }
 }

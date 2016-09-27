@@ -11,9 +11,9 @@ final class SerializedDatabase {
     }
     
     /// The dispatch queue
-    private let queue: dispatch_queue_t
+    private let queue: DispatchQueue
     
-    init(path: String, configuration: Configuration = Configuration(), schemaCache: DatabaseSchemaCacheType) throws {
+    init(path: String, configuration: Configuration = Configuration(), schemaCache: DatabaseSchemaCache) throws {
         // According to https://www.sqlite.org/threadsafe.html
         //
         // > SQLite support three different threading modes:
@@ -32,17 +32,17 @@ final class SerializedDatabase {
         // Since our database connection is only used via our serial dispatch
         // queue, there is no purpose using the default serialized mode.
         var config = configuration
-        config.threadingMode = .MultiThread
+        config.threadingMode = .multiThread
         
         db = try Database(path: path, configuration: config, schemaCache: schemaCache)
-        queue = SchedulingWatchdog.makeSerializedQueueAllowing(database: db)
-        try dispatchSync(queue) {
-            try self.db.setup()
+        queue = SchedulingWatchdog.makeSerializedQueue(allowingDatabase: db)
+        try queue.sync {
+            try db.setup()
         }
     }
     
     deinit {
-        performSync { db in
+        sync { db in
             db.close()
         }
     }
@@ -51,132 +51,63 @@ final class SerializedDatabase {
     /// its result.
     ///
     /// This method is *not* reentrant.
-    func performSync<T>(block: (db: Database) throws -> T) rethrows -> T {
-        // Three diffent cases:
+    func sync<T>(_ block: (Database) throws -> T) rethrows -> T {
+        // Three different cases:
         //
         // 1. A database is invoked from some queue like the main queue:
         //
-        //      dbQueue.inDatabase { db in
+        //      dbQueue.inDatabase { db in       // <-- we're here
         //      }
         //
         // 2. A database is invoked in a reentrant way:
         //
         //      dbQueue.inDatabase { db in
-        //          dbQueue.inDatabase { db in
+        //          dbQueue.inDatabase { db in   // <-- we're here
         //          }
         //      }
         //
         // 3. A database in invoked from another database:
         //
         //      dbQueue1.inDatabase { db1 in
-        //          dbQueue2.inDatabase { db2 in
+        //          dbQueue2.inDatabase { db2 in // <-- we're here
         //          }
         //      }
         
-        if let sourceWatchdog = SchedulingWatchdog.current {
-            // Case 2 or 3:
-            //
-            // 2. A database is invoked in a reentrant way:
-            //
-            //      dbQueue.inDatabase { db in
-            //          dbQueue.inDatabase { db in
-            //          }
-            //      }
-            //
-            // 3. A database in invoked from another database:
-            //
-            //      dbQueue1.inDatabase { db1 in
-            //          dbQueue2.inDatabase { db2 in
-            //          }
-            //      }
-            //
-            // 2 is forbidden.
-            GRDBPrecondition(!sourceWatchdog.allows(db), "Database methods are not reentrant.")
-            
-            // Case 3:
-            //
-            // 3. A database in invoked from another database:
-            //
-            //      dbQueue1.inDatabase { db1 in
-            //          dbQueue2.inDatabase { db2 in
-            //          }
-            //      }
-            //
-            // Let's enter the new queue, and temporarily allow the
-            // currently allowed databases inside.
-            //
-            // The impl function helps us turn dispatch_sync into a rethrowing function
-            func impl(queue: dispatch_queue_t, db: Database, block: (db: Database) throws -> T, onError: (ErrorType) throws -> ()) rethrows -> T {
-                var result: T? = nil
-                var blockError: ErrorType? = nil
-                dispatch_sync(queue) {
-                    let targetWatchdog = SchedulingWatchdog.current!
-                    assert(targetWatchdog.allowedDatabases[0] === db) // sanity check
-                    
-                    do {
-                        let backup = targetWatchdog.allowedDatabases
-                        targetWatchdog.allowedDatabases.appendContentsOf(sourceWatchdog.allowedDatabases)
-                        defer {
-                            targetWatchdog.allowedDatabases = backup
-                        }
-                        result = try block(db: db)
-                    } catch {
-                        blockError = error
-                    }
-                }
-                if let blockError = blockError {
-                    try onError(blockError)
-                }
-                return result!
+        guard let watchdog = SchedulingWatchdog.current else {
+            // Case 1
+            return try queue.sync {
+                try block(db)
             }
-            return try impl(queue, db: db, block: block, onError: { throw $0 })
-        } else {
-            // Case 1:
-            //
-            // 1. A database is invoked from some queue like the main queue:
-            //
-            //      dbQueue.inDatabase { db in
-            //      }
-            //
-            // Just dispatch block to queue:
-            //
-            // The impl function helps us turn dispatch_sync into a rethrowing function
-            func impl(queue: dispatch_queue_t, db: Database, block: (db: Database) throws -> T, onError: (ErrorType) throws -> ()) rethrows -> T {
-                var result: T? = nil
-                var blockError: ErrorType? = nil
-                dispatch_sync(queue) {
-                    do {
-                        result = try block(db: db)
-                    } catch {
-                        blockError = error
-                    }
-                }
-                if let blockError = blockError {
-                    try onError(blockError)
-                }
-                return result!
+        }
+        
+        // Case 2 is forbidden.
+        GRDBPrecondition(!watchdog.allows(db), "Database methods are not reentrant.")
+        
+        // Case 3
+        return try queue.sync {
+            try SchedulingWatchdog.current!.allowing(databases: watchdog.allowedDatabases) {
+                try block(db)
             }
-            return try impl(queue, db: db, block: block, onError: { throw $0 })
         }
     }
     
     /// Asynchronously executes a block in the serialized dispatch queue.
-    func performAsync(block: (db: Database) -> Void) {
-        dispatch_async(queue) {
-            block(db: self.db)
+    func async(_ block: @escaping (Database) -> Void) {
+        queue.async {
+            block(self.db)
         }
     }
     
     /// Executes the block in the current queue.
     ///
     /// - precondition: the current dispatch queue is valid.
-    func perform<T>(block: (db: Database) throws -> T) rethrows -> T {
+    func execute<T>(_ block: (Database) throws -> T) rethrows -> T {
         preconditionValidQueue()
-        return try block(db: db)
+        return try block(db)
     }
     
     /// Fatal error if current dispatch queue is not valid.
-    func preconditionValidQueue(@autoclosure message: () -> String = "Database was not used on the correct thread.", file: StaticString = #file, line: UInt = #line) {
+    func preconditionValidQueue(_ message: @autoclosure() -> String = "Database was not used on the correct thread.", file: StaticString = #file, line: UInt = #line) {
         SchedulingWatchdog.preconditionValidQueue(db, message, file: file, line: line)
     }
 }

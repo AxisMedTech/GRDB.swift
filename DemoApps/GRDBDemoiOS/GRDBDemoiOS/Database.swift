@@ -4,20 +4,20 @@ import UIKit
 // The shared database queue
 var dbQueue: DatabaseQueue!
 
-func setupDatabase(application: UIApplication) {
+func setupDatabase(_ application: UIApplication) {
     
     // Connect to the database
     // See https://github.com/groue/GRDB.swift/#database-connections
     
-    let documentsPath = NSSearchPathForDirectoriesInDomains(.DocumentDirectory, .UserDomainMask, true).first! as NSString
-    let databasePath = documentsPath.stringByAppendingPathComponent("db.sqlite")
+    let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first! as NSString
+    let databasePath = documentsPath.appendingPathComponent("db.sqlite")
     dbQueue = try! DatabaseQueue(path: databasePath)
     
     
     // Be a nice iOS citizen, and don't consume too much memory
     // See https://github.com/groue/GRDB.swift/#memory-management
     
-    dbQueue.setupMemoryManagement(application: application)
+    dbQueue.setupMemoryManagement(in: application)
     
     
     // Use DatabaseMigrator to setup the database
@@ -26,15 +26,13 @@ func setupDatabase(application: UIApplication) {
     var migrator = DatabaseMigrator()
     
     migrator.registerMigration("createPersons") { db in
-        // Have person names compared in a localized case insensitive fashion
+        // Compare person names in a localized case insensitive fashion
         // See https://github.com/groue/GRDB.swift/#unicode
-        let collation = DatabaseCollation.localizedCaseInsensitiveCompare
-        try db.execute(
-            "CREATE TABLE persons (" +
-                "id INTEGER PRIMARY KEY, " +
-                "name TEXT NOT NULL COLLATE \(collation.name), " +
-                "score INTEGER NOT NULL " +
-            ")")
+        try db.create(table: "persons") { t in
+            t.column("id", .integer).primaryKey()
+            t.column("name", .text).notNull().collate(.localizedCaseInsensitiveCompare)
+            t.column("score", .integer).notNull()
+        }
     }
     
     migrator.registerMigration("addPersons") { db in

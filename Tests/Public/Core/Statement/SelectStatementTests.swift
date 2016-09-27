@@ -9,7 +9,7 @@ import XCTest
 
 class SelectStatementTests : GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createPersons") { db in
             try db.execute(
@@ -31,7 +31,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT COUNT(*) FROM persons WHERE age < ?")
+                let statement = try db.makeSelectStatement("SELECT COUNT(*) FROM persons WHERE age < ?")
                 let ages = [20, 30, 40, 50]
                 let counts = ages.map { Int.fetchOne(statement, arguments: [$0])! }
                 XCTAssertEqual(counts, [1,2,2,3])
@@ -43,7 +43,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT COUNT(*) FROM persons WHERE age < ?")
+                let statement = try db.makeSelectStatement("SELECT COUNT(*) FROM persons WHERE age < ?")
                 let ages = [20, 30, 40, 50]
                 let counts = ages.map { (age: Int) -> Int in
                     statement.arguments = [age]
@@ -58,7 +58,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT COUNT(*) FROM persons WHERE age < :age")
+                let statement = try db.makeSelectStatement("SELECT COUNT(*) FROM persons WHERE age < :age")
                 // TODO: Remove this explicit type declaration required by rdar://22357375
                 let ageDicts: [[String: DatabaseValueConvertible?]] = [["age": 20], ["age": 30], ["age": 40], ["age": 50]]
                 let counts = ageDicts.map { dic -> Int in
@@ -75,7 +75,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT COUNT(*) FROM persons WHERE age < :age")
+                let statement = try db.makeSelectStatement("SELECT COUNT(*) FROM persons WHERE age < :age")
                 // TODO: Remove this explicit type declaration required by rdar://22357375
                 let ageDicts: [[String: DatabaseValueConvertible?]] = [["age": 20], ["age": 30], ["age": 40], ["age": 50]]
                 let counts = ageDicts.map { ageDict -> Int in
@@ -91,7 +91,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT * FROM persons ORDER BY name")
+                let statement = try db.makeSelectStatement("SELECT * FROM persons ORDER BY name")
                 var names1 = Row.fetch(statement).map { $0.value(named: "name") as String }
                 var names2 = Row.fetch(statement).map { $0.value(named: "name") as String }
                 
@@ -109,7 +109,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT * FROM persons ORDER BY name")
+                let statement = try db.makeSelectStatement("SELECT * FROM persons ORDER BY name")
                 let rows = Row.fetch(statement)
                 var names1 = rows.map { $0.value(named: "name") as String }
                 var names2 = rows.map { $0.value(named: "name") as String }
@@ -128,7 +128,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT name FROM persons ORDER BY name")
+                let statement = try db.makeSelectStatement("SELECT name FROM persons ORDER BY name")
                 var names1 = Array(String.fetch(statement))
                 var names2 = Array(String.fetch(statement))
                 
@@ -146,7 +146,7 @@ class SelectStatementTests : GRDBTestCase {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
-                let statement = try db.selectStatement("SELECT name FROM persons ORDER BY name")
+                let statement = try db.makeSelectStatement("SELECT name FROM persons ORDER BY name")
                 let nameSequence = String.fetch(statement)
                 var names1 = Array(nameSequence)
                 var names2 = Array(nameSequence)
@@ -166,7 +166,7 @@ class SelectStatementTests : GRDBTestCase {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
                 do {
-                    _ = try db.selectStatement("SELECT * FROM blah")
+                    _ = try db.makeSelectStatement("SELECT * FROM blah")
                     XCTFail()
                 } catch let error as DatabaseError {
                     XCTAssertEqual(error.code, 1)

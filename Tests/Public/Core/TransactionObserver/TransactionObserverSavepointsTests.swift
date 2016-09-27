@@ -7,30 +7,34 @@ import XCTest
     import GRDB
 #endif
 
-private class TransactionObserver : TransactionObserverType {
+private class Observer : TransactionObserver {
     var lastCommittedEvents: [DatabaseEvent] = []
     var events: [DatabaseEvent] = []
     
 #if SQLITE_ENABLE_PREUPDATE_HOOK
     var preUpdateEvents: [DatabasePreUpdateEvent] = []
-    func databaseWillChangeWithEvent(event: DatabasePreUpdateEvent) {
+    func databaseWillChange(with event: DatabasePreUpdateEvent) {
         preUpdateEvents.append(event.copy())
     }
 #endif
     
-    func databaseDidChangeWithEvent(event: DatabaseEvent) {
+    func observes(eventsOfKind eventKind: DatabaseEventKind) -> Bool {
+        return true
+    }
+    
+    func databaseDidChange(with event: DatabaseEvent) {
         events.append(event.copy())
     }
     
     func databaseWillCommit() throws {
     }
     
-    func databaseDidCommit(db: Database) {
+    func databaseDidCommit(_ db: Database) {
         lastCommittedEvents = events
         events = []
     }
     
-    func databaseDidRollback(db: Database) {
+    func databaseDidRollback(_ db: Database) {
         lastCommittedEvents = []
         events = []
     }
@@ -38,7 +42,7 @@ private class TransactionObserver : TransactionObserverType {
 
 class TransactionObserverSavepointsTests: GRDBTestCase {
     
-    private func match(event event: DatabaseEvent, kind: DatabaseEvent.Kind, tableName: String, rowId: Int64) -> Bool {
+    private func match(event: DatabaseEvent, kind: DatabaseEvent.Kind, tableName: String, rowId: Int64) -> Bool {
         return (event.tableName == tableName) && (event.rowID == rowId) && (event.kind == kind)
     }
     
@@ -46,7 +50,7 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     
     private func match(preUpdateEvent event: DatabasePreUpdateEvent, kind: DatabasePreUpdateEvent.Kind, tableName: String, initialRowID: Int64?, finalRowID: Int64?, initialValues: [DatabaseValue]?, finalValues: [DatabaseValue]?, depth: CInt = 0) -> Bool {
         
-        func checkDatabaseValues(values: [DatabaseValue]?, expected: [DatabaseValue]?) -> Bool {
+        func check(databaseValues values: [DatabaseValue]?, expected: [DatabaseValue]?) -> Bool {
             if let values = values {
                 guard let expected = expected else { return false }
                 return values == expected
@@ -64,8 +68,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
         guard (event.depth == depth) else { return false }
         guard (event.initialRowID == initialRowID) else { return false }
         guard (event.finalRowID == finalRowID) else { return false }
-        guard checkDatabaseValues(event.initialDatabaseValues, expected: initialValues) else { return false }
-        guard checkDatabaseValues(event.finalDatabaseValues, expected: finalValues) else { return false }
+        guard check(databaseValues: event.initialDatabaseValues, expected: initialValues) else { return false }
+        guard check(databaseValues: event.finalDatabaseValues, expected: finalValues) else { return false }
         
         return true
     }
@@ -77,8 +81,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     func testSavepointAsTransaction() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
-            let observer = TransactionObserver()
-            dbQueue.addTransactionObserver(observer)
+            let observer = Observer()
+            dbQueue.add(transactionObserver: observer)
             
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE items1 (id INTEGER PRIMARY KEY)")
@@ -97,13 +101,13 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
             }
             
             XCTAssertEqual(observer.lastCommittedEvents.count, 2)
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .Insert, tableName: "items1", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .Insert, tableName: "items2", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .insert, tableName: "items1", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .insert, tableName: "items2", rowId: 1))
             
             #if SQLITE_ENABLE_PREUPDATE_HOOK
                 XCTAssertEqual(observer.preUpdateEvents.count, 2)
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .Insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .Insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
             #endif
         }
     }
@@ -111,8 +115,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     func testSavepointInsideTransaction() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
-            let observer = TransactionObserver()
-            dbQueue.addTransactionObserver(observer)
+            let observer = Observer()
+            dbQueue.add(transactionObserver: observer)
             
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE items1 (id INTEGER PRIMARY KEY)")
@@ -130,13 +134,13 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
             }
             
             XCTAssertEqual(observer.lastCommittedEvents.count, 2)
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .Insert, tableName: "items1", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .Insert, tableName: "items2", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .insert, tableName: "items1", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .insert, tableName: "items2", rowId: 1))
             
             #if SQLITE_ENABLE_PREUPDATE_HOOK
                 XCTAssertEqual(observer.preUpdateEvents.count, 2)
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .Insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .Insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
             #endif
         }
     }
@@ -144,8 +148,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     func testSavepointWithIdenticalName() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
-            let observer = TransactionObserver()
-            dbQueue.addTransactionObserver(observer)
+            let observer = Observer()
+            dbQueue.add(transactionObserver: observer)
             
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE items1 (id INTEGER PRIMARY KEY)")
@@ -176,17 +180,17 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
             }
             
             XCTAssertEqual(observer.lastCommittedEvents.count, 4)
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .Insert, tableName: "items1", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .Insert, tableName: "items2", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[2], kind: .Insert, tableName: "items3", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[3], kind: .Insert, tableName: "items4", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .insert, tableName: "items1", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .insert, tableName: "items2", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[2], kind: .insert, tableName: "items3", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[3], kind: .insert, tableName: "items4", rowId: 1))
             
             #if SQLITE_ENABLE_PREUPDATE_HOOK
                 XCTAssertEqual(observer.preUpdateEvents.count, 4)
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .Insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .Insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[2], kind: .Insert, tableName: "items3", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[3], kind: .Insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[2], kind: .insert, tableName: "items3", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[3], kind: .insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
             #endif
         }
     }
@@ -194,8 +198,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     func testMultipleRollbackOfSavepoint() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
-            let observer = TransactionObserver()
-            dbQueue.addTransactionObserver(observer)
+            let observer = Observer()
+            dbQueue.add(transactionObserver: observer)
             
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE items1 (id INTEGER PRIMARY KEY)")
@@ -225,13 +229,13 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
             }
             
             XCTAssertEqual(observer.lastCommittedEvents.count, 2)
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .Insert, tableName: "items1", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .Insert, tableName: "items4", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .insert, tableName: "items1", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .insert, tableName: "items4", rowId: 1))
             
             #if SQLITE_ENABLE_PREUPDATE_HOOK
                 XCTAssertEqual(observer.preUpdateEvents.count, 2)
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .Insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .Insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
             #endif
         }
     }
@@ -239,8 +243,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     func testReleaseSavepoint() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
-            let observer = TransactionObserver()
-            dbQueue.addTransactionObserver(observer)
+            let observer = Observer()
+            dbQueue.add(transactionObserver: observer)
             
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE items1 (id INTEGER PRIMARY KEY)")
@@ -267,17 +271,17 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
             }
             
             XCTAssertEqual(observer.lastCommittedEvents.count, 4)
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .Insert, tableName: "items1", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .Insert, tableName: "items2", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[2], kind: .Insert, tableName: "items3", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[3], kind: .Insert, tableName: "items4", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .insert, tableName: "items1", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .insert, tableName: "items2", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[2], kind: .insert, tableName: "items3", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[3], kind: .insert, tableName: "items4", rowId: 1))
             
             #if SQLITE_ENABLE_PREUPDATE_HOOK
                 XCTAssertEqual(observer.preUpdateEvents.count, 4)
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .Insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .Insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[2], kind: .Insert, tableName: "items3", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[3], kind: .Insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .insert, tableName: "items2", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[2], kind: .insert, tableName: "items3", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[3], kind: .insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
             #endif
         }
     }
@@ -285,8 +289,8 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
     func testRollbackNonNestedSavepointInsideTransaction() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
-            let observer = TransactionObserver()
-            dbQueue.addTransactionObserver(observer)
+            let observer = Observer()
+            dbQueue.add(transactionObserver: observer)
             
             try dbQueue.inDatabase { db in
                 try db.execute("CREATE TABLE items1 (id INTEGER PRIMARY KEY)")
@@ -317,13 +321,13 @@ class TransactionObserverSavepointsTests: GRDBTestCase {
             }
             
             XCTAssertEqual(observer.lastCommittedEvents.count, 2)
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .Insert, tableName: "items1", rowId: 1))
-            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .Insert, tableName: "items4", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[0], kind: .insert, tableName: "items1", rowId: 1))
+            XCTAssertTrue(match(event: observer.lastCommittedEvents[1], kind: .insert, tableName: "items4", rowId: 1))
             
             #if SQLITE_ENABLE_PREUPDATE_HOOK
                 XCTAssertEqual(observer.preUpdateEvents.count, 2)
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .Insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
-                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .Insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[0], kind: .insert, tableName: "items1", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
+                XCTAssertTrue(match(preUpdateEvent: observer.preUpdateEvents[1], kind: .insert, tableName: "items4", initialRowID: nil, finalRowID: 1, initialValues: nil, finalValues: [Int(1).databaseValue]))
             #endif
         }
     }

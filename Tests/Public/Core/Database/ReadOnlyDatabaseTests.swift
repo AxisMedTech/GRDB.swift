@@ -13,14 +13,14 @@ class ReadOnlyDatabaseTests : GRDBTestCase {
         assertNoError {
             // Create database
             do {
-                try makeDatabaseQueue()
+                _ = try makeDatabaseQueue()
             }
             
             // Open it again, readonly
             dbConfiguration.readonly = true
             let dbQueue = try makeDatabaseQueue()
             let statement = try dbQueue.inDatabase { db in
-                try db.updateStatement("CREATE TABLE items (id INTEGER PRIMARY KEY)")
+                try db.makeUpdateStatement("CREATE TABLE items (id INTEGER PRIMARY KEY)")
             }
             do {
                 try dbQueue.inDatabase { db in

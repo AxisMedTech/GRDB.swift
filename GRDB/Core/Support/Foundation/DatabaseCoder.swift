@@ -5,12 +5,12 @@ import Foundation
 public struct DatabaseCoder: DatabaseValueConvertible {
     
     /// The object
-    public let object: AnyObject
+    public let object: Any
     
     /// Creates a DatabaseCoder from an object that conforms to NSCoding.
     ///
     /// The result is nil if and only if *object* is nil.
-    public init?(_ object: AnyObject?) {
+    public init?(_ object: Any?) {
         guard let object = object else {
             return nil
         }
@@ -19,14 +19,14 @@ public struct DatabaseCoder: DatabaseValueConvertible {
     
     /// Returns a value that can be stored in the database.
     public var databaseValue: DatabaseValue {
-        return NSKeyedArchiver.archivedDataWithRootObject(object).databaseValue
+        return NSKeyedArchiver.archivedData(withRootObject: object).databaseValue
     }
     
     /// Returns a DatabaseCoder if *databaseValue* contains an archived object.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> DatabaseCoder? {
-        guard let data = NSData.fromDatabaseValue(databaseValue) else {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> DatabaseCoder? {
+        guard let data = Data.fromDatabaseValue(databaseValue) else {
             return nil
         }
-        return DatabaseCoder(NSKeyedUnarchiver.unarchiveObjectWithData(data))
+        return DatabaseCoder(NSKeyedUnarchiver.unarchiveObject(with: data))
     }
 }

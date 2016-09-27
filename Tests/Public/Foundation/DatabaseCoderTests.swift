@@ -16,7 +16,7 @@ class DatabaseCoderTests: GRDBTestCase {
                 try db.execute("CREATE TABLE arrays (array BLOB)")
                 
                 let array = [1,2,3]
-                try db.execute("INSERT INTO arrays VALUES (?)", arguments: [DatabaseCoder(array)])
+                try db.execute("INSERT INTO arrays VALUES (?)", arguments: [DatabaseCoder(array as NSArray)])
                 
                 let row = Row.fetchOne(db, "SELECT * FROM arrays")!
                 let fetchedArray = ((row.value(named: "array") as DatabaseCoder).object as! NSArray).map { $0 as! Int }
@@ -30,7 +30,7 @@ class DatabaseCoderTests: GRDBTestCase {
     }
     
     func testDatabaseCoderFromDatabaseValueFailure() {
-        let databaseValue_Null = DatabaseValue.Null
+        let databaseValue_Null = DatabaseValue.null
         let databaseValue_Int64 = Int64(1).databaseValue
         let databaseValue_String = "foo".databaseValue
         let databaseValue_Double = Double(100000.1).databaseValue

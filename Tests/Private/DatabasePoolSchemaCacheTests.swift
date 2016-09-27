@@ -20,13 +20,15 @@ class DatabasePoolSchemaCacheTests : GRDBTestCase {
             
             dbPool.write { db in
                 // Assert that the writer cache is empty
-                XCTAssertTrue(db.schemaCache.primaryKey(tableName: "items") == nil)
+                XCTAssertTrue(db.schemaCache.primaryKey("items") == nil)
+                XCTAssertTrue(db.schemaCache.columns(in: "items") == nil)
                 XCTAssertTrue(db.schemaCache.indexes(on: "items") == nil)
             }
             
             dbPool.read { db in
                 // Assert that a reader cache is empty
-                XCTAssertTrue(db.schemaCache.primaryKey(tableName: "items") == nil)
+                XCTAssertTrue(db.schemaCache.primaryKey("items") == nil)
+                XCTAssertTrue(db.schemaCache.columns(in: "items") == nil)
                 XCTAssertTrue(db.schemaCache.indexes(on: "items") == nil)
             }
             
@@ -35,6 +37,14 @@ class DatabasePoolSchemaCacheTests : GRDBTestCase {
                 let primaryKey = try db.primaryKey("items")!
                 XCTAssertEqual(primaryKey.rowIDColumn, "id")
 
+                let columns = try db.columns(in: "items")
+                XCTAssertEqual(columns.count, 4)
+                // TODO: test more properties
+                XCTAssertEqual(columns[0].name, "id")
+                XCTAssertEqual(columns[1].name, "email")
+                XCTAssertEqual(columns[2].name, "foo")
+                XCTAssertEqual(columns[3].name, "bar")
+                
                 let indexes = db.indexes(on: "items")
                 XCTAssertEqual(indexes.count, 2)
                 for index in indexes {
@@ -49,13 +59,15 @@ class DatabasePoolSchemaCacheTests : GRDBTestCase {
                 }
 
                 // Assert that reader cache is warmed
-                XCTAssertTrue(db.schemaCache.primaryKey(tableName: "items") != nil)
+                XCTAssertTrue(db.schemaCache.primaryKey("items") != nil)
+                XCTAssertTrue(db.schemaCache.columns(in: "items") != nil)
                 XCTAssertTrue(db.schemaCache.indexes(on: "items") != nil)
             }
             
             dbPool.write { db in
                 // Assert that writer cache is warmed
-                XCTAssertTrue(db.schemaCache.primaryKey(tableName: "items") != nil)
+                XCTAssertTrue(db.schemaCache.primaryKey("items") != nil)
+                XCTAssertTrue(db.schemaCache.columns(in: "items") != nil)
                 XCTAssertTrue(db.schemaCache.indexes(on: "items") != nil)
             }
             
@@ -64,13 +76,15 @@ class DatabasePoolSchemaCacheTests : GRDBTestCase {
                 try db.execute("DROP TABLE items")
                 
                 // Assert that the writer cache is empty
-                XCTAssertTrue(db.schemaCache.primaryKey(tableName: "items") == nil)
+                XCTAssertTrue(db.schemaCache.primaryKey("items") == nil)
+                XCTAssertTrue(db.schemaCache.columns(in: "items") == nil)
                 XCTAssertTrue(db.schemaCache.indexes(on: "items") == nil)
             }
             
             dbPool.read { db in
                 // Assert that a reader cache is empty
-                XCTAssertTrue(db.schemaCache.primaryKey(tableName: "items") == nil)
+                XCTAssertTrue(db.schemaCache.primaryKey("items") == nil)
+                XCTAssertTrue(db.schemaCache.columns(in: "items") == nil)
                 XCTAssertTrue(db.schemaCache.indexes(on: "items") == nil)
             }
             
@@ -105,26 +119,26 @@ class DatabasePoolSchemaCacheTests : GRDBTestCase {
             // Block 1                              Block 2
             // SELECT 1 FROM items WHERE id = 1
             // >
-            let s1 = dispatch_semaphore_create(0)
+            let s1 = DispatchSemaphore(value: 0)
             //                                      SELECT 1 FROM items WHERE id = 1
             
             let block1 = { () in
                 dbPool.read { db in
                     let stmt = try! db.cachedSelectStatement("SELECT * FROM items")
                     XCTAssertEqual(Int.fetchOne(stmt)!, 1)
-                    dispatch_semaphore_signal(s1)
+                    s1.signal()
                 }
             }
             let block2 = { () in
                 dbPool.read { db in
-                    dispatch_semaphore_wait(s1, DISPATCH_TIME_FOREVER)
+                    _ = s1.wait(timeout: .distantFuture)
                     let stmt = try! db.cachedSelectStatement("SELECT * FROM items")
                     XCTAssertEqual(Int.fetchOne(stmt)!, 1)
                 }
             }
-            let queue = dispatch_queue_create(nil, DISPATCH_QUEUE_CONCURRENT)
-            dispatch_apply(2, queue) { index in
-                [block1, block2][index]()
+            let blocks = [block1, block2]
+            DispatchQueue.concurrentPerform(iterations: blocks.count) { index in
+                blocks[index]()
             }
         }
     }

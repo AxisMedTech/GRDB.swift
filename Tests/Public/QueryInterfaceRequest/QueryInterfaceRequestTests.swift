@@ -8,10 +8,10 @@ import XCTest
 #endif
 
 private struct Col {
-    static let id = SQLColumn("id")
-    static let name = SQLColumn("name")
-    static let age = SQLColumn("age")
-    static let readerId = SQLColumn("readerId")
+    static let id = Column("id")
+    static let name = Column("name")
+    static let age = Column("age")
+    static let readerId = Column("readerId")
 }
 
 private let tableRequest = QueryInterfaceRequest<Void>(tableName: "readers")
@@ -20,11 +20,11 @@ class QueryInterfaceRequestTests: GRDBTestCase {
 
     var collation: DatabaseCollation!
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         collation = DatabaseCollation("localized_case_insensitive") { (lhs, rhs) in
             return (lhs as NSString).localizedCaseInsensitiveCompare(rhs)
         }
-        dbWriter.addCollation(collation)
+        dbWriter.add(collation: collation)
         
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createReaders") { db in
@@ -50,7 +50,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 do {
                     let rows = Row.fetchAll(db, tableRequest)
-                    XCTAssertEqual(self.lastSQLQuery, "SELECT * FROM \"readers\"")
+                    XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\"")
                     XCTAssertEqual(rows.count, 2)
                     XCTAssertEqual(rows[0].value(named: "id") as Int64, 1)
                     XCTAssertEqual(rows[0].value(named: "name") as String, "Arthur")
@@ -62,7 +62,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 do {
                     let row = Row.fetchOne(db, tableRequest)!
-                    XCTAssertEqual(self.lastSQLQuery, "SELECT * FROM \"readers\"")
+                    XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\"")
                     XCTAssertEqual(row.value(named: "id") as Int64, 1)
                     XCTAssertEqual(row.value(named: "name") as String, "Arthur")
                     XCTAssertEqual(row.value(named: "age") as Int, 42)
@@ -73,7 +73,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                     for row in Row.fetch(db, tableRequest) {
                         names.append(row.value(named: "name"))
                     }
-                    XCTAssertEqual(self.lastSQLQuery, "SELECT * FROM \"readers\"")
+                    XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\"")
                     XCTAssertEqual(names, ["Arthur", "Barbara"])
                 }
             }
@@ -87,43 +87,43 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         let dbQueue = try! makeDatabaseQueue()
         dbQueue.inDatabase { db in
             XCTAssertEqual(tableRequest.fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
             
-            XCTAssertEqual(tableRequest.reverse().fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
+            XCTAssertEqual(tableRequest.reversed().fetchCount(db), 0)
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
             
             XCTAssertEqual(tableRequest.order(Col.name).fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
             
             XCTAssertEqual(tableRequest.limit(10).fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM (SELECT * FROM \"readers\" LIMIT 10)")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM (SELECT * FROM \"readers\" LIMIT 10)")
             
             XCTAssertEqual(tableRequest.filter(Col.age == 42).fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM \"readers\" WHERE (\"age\" = 42)")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM \"readers\" WHERE (\"age\" = 42)")
             
-            XCTAssertEqual(tableRequest.distinct.fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM (SELECT DISTINCT * FROM \"readers\")")
+            XCTAssertEqual(tableRequest.distinct().fetchCount(db), 0)
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM (SELECT DISTINCT * FROM \"readers\")")
             
             XCTAssertEqual(tableRequest.select(Col.name).fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
             
-            XCTAssertEqual(tableRequest.select(Col.name).distinct.fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(DISTINCT \"name\") FROM \"readers\"")
+            XCTAssertEqual(tableRequest.select(Col.name).distinct().fetchCount(db), 0)
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(DISTINCT \"name\") FROM \"readers\"")
             
-            XCTAssertEqual(tableRequest.select(Col.age * 2).distinct.fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(DISTINCT (\"age\" * 2)) FROM \"readers\"")
+            XCTAssertEqual(tableRequest.select(Col.age * 2).distinct().fetchCount(db), 0)
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(DISTINCT (\"age\" * 2)) FROM \"readers\"")
             
-            XCTAssertEqual(tableRequest.select((Col.age * 2).aliased("ignored")).distinct.fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(DISTINCT (\"age\" * 2)) FROM \"readers\"")
+            XCTAssertEqual(tableRequest.select((Col.age * 2).aliased("ignored")).distinct().fetchCount(db), 0)
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(DISTINCT (\"age\" * 2)) FROM \"readers\"")
             
             XCTAssertEqual(tableRequest.select(Col.name, Col.age).fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM \"readers\"")
             
-            XCTAssertEqual(tableRequest.select(Col.name, Col.age).distinct.fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM (SELECT DISTINCT \"name\", \"age\" FROM \"readers\")")
+            XCTAssertEqual(tableRequest.select(Col.name, Col.age).distinct().fetchCount(db), 0)
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM (SELECT DISTINCT \"name\", \"age\" FROM \"readers\")")
             
             XCTAssertEqual(tableRequest.select(max(Col.age)).group(Col.name).fetchCount(db), 0)
-            XCTAssertEqual(self.lastSQLQuery, "SELECT COUNT(*) FROM (SELECT MAX(\"age\") FROM \"readers\" GROUP BY \"name\")")
+            XCTAssertEqual(lastSQLQuery, "SELECT COUNT(*) FROM (SELECT MAX(\"age\") FROM \"readers\" GROUP BY \"name\")")
         }
     }
     
@@ -139,7 +139,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 let request = tableRequest.select(sql: "name, id - 1")
                 let rows = Row.fetchAll(db, request)
-                XCTAssertEqual(self.lastSQLQuery, "SELECT name, id - 1 FROM \"readers\"")
+                XCTAssertEqual(lastSQLQuery, "SELECT name, id - 1 FROM \"readers\"")
                 XCTAssertEqual(rows.count, 2)
                 XCTAssertEqual(rows[0].value(atIndex: 0) as String, "Arthur")
                 XCTAssertEqual(rows[0].value(atIndex: 1) as Int64, 0)
@@ -158,7 +158,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 let request = tableRequest.select(sql: "name, id - ?", arguments: [1])
                 let rows = Row.fetchAll(db, request)
-                XCTAssertEqual(self.lastSQLQuery, "SELECT name, id - 1 FROM \"readers\"")
+                XCTAssertEqual(lastSQLQuery, "SELECT name, id - 1 FROM \"readers\"")
                 XCTAssertEqual(rows.count, 2)
                 XCTAssertEqual(rows[0].value(atIndex: 0) as String, "Arthur")
                 XCTAssertEqual(rows[0].value(atIndex: 1) as Int64, 0)
@@ -177,7 +177,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 let request = tableRequest.select(sql: "name, id - :n", arguments: ["n": 1])
                 let rows = Row.fetchAll(db, request)
-                XCTAssertEqual(self.lastSQLQuery, "SELECT name, id - 1 FROM \"readers\"")
+                XCTAssertEqual(lastSQLQuery, "SELECT name, id - 1 FROM \"readers\"")
                 XCTAssertEqual(rows.count, 2)
                 XCTAssertEqual(rows[0].value(atIndex: 0) as String, "Arthur")
                 XCTAssertEqual(rows[0].value(atIndex: 1) as Int64, 0)
@@ -196,7 +196,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 let request = tableRequest.select(Col.name, Col.id - 1)
                 let rows = Row.fetchAll(db, request)
-                XCTAssertEqual(self.lastSQLQuery, "SELECT \"name\", (\"id\" - 1) FROM \"readers\"")
+                XCTAssertEqual(lastSQLQuery, "SELECT \"name\", (\"id\" - 1) FROM \"readers\"")
                 XCTAssertEqual(rows.count, 2)
                 XCTAssertEqual(rows[0].value(atIndex: 0) as String, "Arthur")
                 XCTAssertEqual(rows[0].value(atIndex: 1) as Int64, 0)
@@ -214,7 +214,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
                 
                 let request = tableRequest.select(Col.name.aliased("nom"), (Col.age + 1).aliased("agePlusOne"))
                 let row = Row.fetchOne(db, request)!
-                XCTAssertEqual(self.lastSQLQuery, "SELECT \"name\" AS \"nom\", (\"age\" + 1) AS \"agePlusOne\" FROM \"readers\"")
+                XCTAssertEqual(lastSQLQuery, "SELECT \"name\" AS \"nom\", (\"age\" + 1) AS \"agePlusOne\" FROM \"readers\"")
                 XCTAssertEqual(row.value(named: "nom") as String, "Arthur")
                 XCTAssertEqual(row.value(named: "agePlusOne") as Int, 43)
             }
@@ -234,7 +234,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
     func testDistinct() {
         let dbQueue = try! makeDatabaseQueue()
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.select(Col.name).distinct),
+            sql(dbQueue, tableRequest.select(Col.name).distinct()),
             "SELECT DISTINCT \"name\" FROM \"readers\"")
     }
     
@@ -401,10 +401,10 @@ class QueryInterfaceRequestTests: GRDBTestCase {
     func testSortWithCollation() {
         let dbQueue = try! makeDatabaseQueue()
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.name.collating("NOCASE"))),
+            sql(dbQueue, tableRequest.order(Col.name.collating(.nocase))),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.name.collating("NOCASE").asc)),
+            sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).asc)),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE ASC")
         XCTAssertEqual(
             sql(dbQueue, tableRequest.order(Col.name.collating(collation))),
@@ -415,7 +415,7 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         let dbQueue = try! makeDatabaseQueue()
         XCTAssertEqual(
             sql(dbQueue, tableRequest.order(Col.age).order(Col.name)),
-            "SELECT * FROM \"readers\" ORDER BY \"age\", \"name\"")
+            "SELECT * FROM \"readers\" ORDER BY \"name\"")
     }
     
     
@@ -424,45 +424,45 @@ class QueryInterfaceRequestTests: GRDBTestCase {
     func testReverse() {
         let dbQueue = try! makeDatabaseQueue()
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.reverse()),
+            sql(dbQueue, tableRequest.reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"_rowid_\" DESC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.age).reverse()),
+            sql(dbQueue, tableRequest.order(Col.age).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"age\" DESC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.age.asc).reverse()),
+            sql(dbQueue, tableRequest.order(Col.age.asc).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"age\" DESC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.age.desc).reverse()),
+            sql(dbQueue, tableRequest.order(Col.age.desc).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"age\" ASC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.age, Col.name.desc).reverse()),
+            sql(dbQueue, tableRequest.order(Col.age, Col.name.desc).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"age\" DESC, \"name\" ASC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(abs(Col.age)).reverse()),
+            sql(dbQueue, tableRequest.order(abs(Col.age)).reversed()),
             "SELECT * FROM \"readers\" ORDER BY ABS(\"age\") DESC")
     }
     
     func testReverseWithCollation() {
         let dbQueue = try! makeDatabaseQueue()
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.name.collating("NOCASE")).reverse()),
+            sql(dbQueue, tableRequest.order(Col.name.collating(.nocase)).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE DESC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.name.collating("NOCASE").asc).reverse()),
+            sql(dbQueue, tableRequest.order(Col.name.collating(.nocase).asc).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE NOCASE DESC")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.name.collating(collation)).reverse()),
+            sql(dbQueue, tableRequest.order(Col.name.collating(collation)).reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"name\" COLLATE localized_case_insensitive DESC")
     }
     
     func testMultipleReverse() {
         let dbQueue = try! makeDatabaseQueue()
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.reverse().reverse()),
+            sql(dbQueue, tableRequest.reversed().reversed()),
             "SELECT * FROM \"readers\"")
         XCTAssertEqual(
-            sql(dbQueue, tableRequest.order(Col.age).order(Col.name).reverse().reverse()),
+            sql(dbQueue, tableRequest.order(Col.age, Col.name).reversed().reversed()),
             "SELECT * FROM \"readers\" ORDER BY \"age\", \"name\"")
     }
     
@@ -484,5 +484,34 @@ class QueryInterfaceRequestTests: GRDBTestCase {
         XCTAssertEqual(
             sql(dbQueue, tableRequest.limit(1, offset: 2).limit(3)),
             "SELECT * FROM \"readers\" LIMIT 3")
+    }
+    
+    
+    // MARK: - Delete
+    
+    func testDelete() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            
+            try dbQueue.inDatabase { db in
+                try tableRequest.deleteAll(db)
+                XCTAssertEqual(self.lastSQLQuery, "DELETE FROM \"readers\"")
+
+                try tableRequest.filter(Col.age == 42).deleteAll(db)
+                XCTAssertEqual(self.lastSQLQuery, "DELETE FROM \"readers\" WHERE (\"age\" = 42)")
+                
+                try tableRequest.filter(sql: "id = 1").deleteAll(db)
+                XCTAssertEqual(self.lastSQLQuery, "DELETE FROM \"readers\" WHERE id = 1")
+                
+                try tableRequest.select(Col.name).deleteAll(db)
+                XCTAssertEqual(self.lastSQLQuery, "DELETE FROM \"readers\"")
+                
+                try tableRequest.distinct().deleteAll(db)
+                XCTAssertEqual(self.lastSQLQuery, "DELETE FROM \"readers\"")
+                
+                try tableRequest.order(Col.name).deleteAll(db)
+                XCTAssertEqual(self.lastSQLQuery, "DELETE FROM \"readers\"")
+            }
+        }
     }
 }

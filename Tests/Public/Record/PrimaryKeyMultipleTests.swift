@@ -20,7 +20,7 @@ private class Citizenship : Record {
         super.init()
     }
     
-    static func setupInDatabase(db: Database) throws {
+    static func setup(inDatabase db: Database) throws {
         try db.execute(
             "CREATE TABLE citizenships (" +
                 "personName TEXT NOT NULL, " +
@@ -32,15 +32,15 @@ private class Citizenship : Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "citizenships"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         personName = row.value(named: "personName")
         countryName = row.value(named: "countryName")
         native = row.value(named: "native")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -54,9 +54,9 @@ private class Citizenship : Record {
 
 class PrimaryKeyMultipleTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
-        migrator.registerMigration("createCitizenship", migrate: Citizenship.setupInDatabase)
+        migrator.registerMigration("createCitizenship", migrate: Citizenship.setup)
         try migrator.migrate(dbWriter)
     }
     
@@ -88,8 +88,8 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM citizenships WHERE personName = ? AND countryName = ?", arguments: [record.personName, record.countryName])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -125,8 +125,8 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM citizenships WHERE personName = ? AND countryName = ?", arguments: [record.personName, record.countryName])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -138,6 +138,21 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
     
     // MARK: - Update
     
+    func testUpdateWithNilPrimaryKeyThrowsRecordNotFound() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                let record = Citizenship(personName: nil, countryName: nil, native: true)
+                do {
+                    try record.update(db)
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
+                }
+            }
+        }
+    }
+    
     func testUpdateWithNotNilPrimaryKeyThatDoesNotMatchAnyRowThrowsRecordNotFound() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
@@ -145,9 +160,9 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 let record = Citizenship(personName: "Arthur", countryName: "France", native: true)
                 do {
                     try record.update(db)
-                    XCTFail("Expected PersistenceError.NotFound")
-                } catch PersistenceError.NotFound {
-                    // Expected PersistenceError.NotFound
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
                 }
             }
         }
@@ -164,8 +179,8 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM citizenships WHERE personName = ? AND countryName = ?", arguments: [record.personName, record.countryName])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -183,9 +198,9 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 try record.delete(db)
                 do {
                     try record.update(db)
-                    XCTFail("Expected PersistenceError.NotFound")
-                } catch PersistenceError.NotFound {
-                    // Expected PersistenceError.NotFound
+                    XCTFail("Expected PersistenceError.recordNotFound")
+                } catch PersistenceError.recordNotFound {
+                    // Expected PersistenceError.recordNotFound
                 }
             }
         }
@@ -219,8 +234,8 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM citizenships WHERE personName = ? AND countryName = ?", arguments: [record.personName, record.countryName])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -241,8 +256,8 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM citizenships WHERE personName = ? AND countryName = ?", arguments: [record.personName, record.countryName])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -262,8 +277,8 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
                 
                 let row = Row.fetchOne(db, "SELECT * FROM citizenships WHERE personName = ? AND countryName = ?", arguments: [record.personName, record.countryName])!
                 for (key, value) in record.persistentDictionary {
-                    if let dbv = row.databaseValue(named: key) {
-                        XCTAssertEqual(dbv, value?.databaseValue ?? .Null)
+                if let dbv: DatabaseValue = row.value(named: key) {
+                    XCTAssertEqual(dbv, value?.databaseValue ?? .null)
                     } else {
                         XCTFail("Missing column \(key) in fetched row")
                     }
@@ -274,6 +289,17 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
     
     
     // MARK: - Delete
+    
+    func testDeleteWithNilPrimaryKey() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                let record = Citizenship(personName: nil, countryName: nil, native: true)
+                let deleted = try record.delete(db)
+                XCTAssertFalse(deleted)
+            }
+        }
+    }
     
     func testDeleteWithNotNilPrimaryKeyThatDoesNotMatchAnyRowDoesNothing() {
         assertNoError {
@@ -393,6 +419,16 @@ class PrimaryKeyMultipleTests: GRDBTestCase {
     
     
     // MARK: - Exists
+    
+    func testExistsWithNilPrimaryKeyReturnsFalse() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            dbQueue.inDatabase { db in
+                let record = Citizenship(personName: nil, countryName: nil, native: true)
+                XCTAssertFalse(record.exists(db))
+            }
+        }
+    }
     
     func testExistsWithNotNilPrimaryKeyThatDoesNotMatchAnyRowReturnsFalse() {
         assertNoError {

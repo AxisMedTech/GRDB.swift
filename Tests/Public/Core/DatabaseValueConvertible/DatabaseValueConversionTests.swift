@@ -8,26 +8,26 @@ import XCTest
 #endif
 
 enum SQLiteStorageClass {
-    case Null
-    case Integer
-    case Real
-    case Text
-    case Blob
+    case null
+    case integer
+    case real
+    case text
+    case blob
 }
 
 extension DatabaseValue {
     var storageClass: SQLiteStorageClass {
         switch storage {
-        case .Null:
-            return .Null
-        case .Int64:
-            return .Integer
-        case .Double:
-            return .Real
-        case .String:
-            return .Text
-        case .Blob:
-            return .Blob
+        case .null:
+            return .null
+        case .int64:
+            return .integer
+        case .double:
+            return .real
+        case .string:
+            return .text
+        case .blob:
+            return .blob
         }
     }
 }
@@ -36,7 +36,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
     
     // Datatypes In SQLite Version 3: https://www.sqlite.org/datatype3.html
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createPersons") { db in
             try db.execute(
@@ -67,7 +67,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: [0 as Int])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -76,12 +76,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertEqual(String.fromDatabaseValue(dbv)!, "0")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as String?)!, "0")
                 XCTAssertEqual((dbv.value() as String), "0")
 
-                return .Rollback
+                return .rollback
             }
             
             // Int64 is turned to Text
@@ -89,7 +89,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: [0 as Int64])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -98,12 +98,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertEqual(String.fromDatabaseValue(dbv)!, "0")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as String?)!, "0")
                 XCTAssertEqual((dbv.value() as String), "0")
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int32 is turned to Text
@@ -111,7 +111,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: [0 as Int32])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -120,12 +120,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertEqual(String.fromDatabaseValue(dbv)!, "0")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as String?)!, "0")
                 XCTAssertEqual((dbv.value() as String), "0")
                 
-                return .Rollback
+                return .rollback
             }
             
             // Double is turned to Real
@@ -133,7 +133,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: [0.0])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -142,12 +142,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertEqual(String.fromDatabaseValue(dbv)!, "0.0")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as String?)!, "0.0")
                 XCTAssertEqual((dbv.value() as String), "0.0")
                 
-                return .Rollback
+                return .rollback
             }
             
             // "3.0e+5" is turned to Text
@@ -155,7 +155,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: ["3.0e+5"])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -164,20 +164,20 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertEqual(String.fromDatabaseValue(dbv)!, "3.0e+5")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
 
                 XCTAssertEqual((dbv.value() as String?)!, "3.0e+5")
                 XCTAssertEqual((dbv.value() as String), "3.0e+5")
 
-                return .Rollback
+                return .rollback
             }
             
-            // "fooéı👨👨🏿🇫🇷🇨🇮" is turned to Text
+            // "'fooéı👨👨🏿🇫🇷🇨🇮'" is turned to Text
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮"])
+                try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'"])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -185,21 +185,21 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int32.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(String.fromDatabaseValue(dbv)!, "fooéı👨👨🏿🇫🇷🇨🇮")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertEqual(String.fromDatabaseValue(dbv)!, "'fooéı👨👨🏿🇫🇷🇨🇮'")
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
-                XCTAssertEqual((dbv.value() as String?)!, "fooéı👨👨🏿🇫🇷🇨🇮")
-                XCTAssertEqual((dbv.value() as String), "fooéı👨👨🏿🇫🇷🇨🇮")
+                XCTAssertEqual((dbv.value() as String?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'")
+                XCTAssertEqual((dbv.value() as String), "'fooéı👨👨🏿🇫🇷🇨🇮'")
                 
-                return .Rollback
+                return .rollback
             }
             
             // Blob is turned to Blob
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)])
+                try db.execute("INSERT INTO `values` (textAffinity) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8)])
                 let dbv = Row.fetchOne(db, "SELECT textAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Blob)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.blob)
                 
                 // Check GRDB conversions from Blob storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -208,12 +208,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(NSData.fromDatabaseValue(dbv), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
+                XCTAssertEqual(Data.fromDatabaseValue(dbv), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                XCTAssertEqual((dbv.value() as NSData?), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
-                XCTAssertTrue((dbv.value() as NSData).isEqualToData("fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)!))
+                XCTAssertEqual((dbv.value() as Data?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
+                XCTAssertEqual((dbv.value() as Data), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                return .Rollback
+                return .rollback
             }
         }
     }
@@ -273,7 +273,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: [0 as Int])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -282,7 +282,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -295,7 +295,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int64 is turned to Real
@@ -303,7 +303,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: [0 as Int64])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -312,7 +312,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -325,7 +325,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int32 is turned to Real
@@ -333,7 +333,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: [0 as Int32])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -342,7 +342,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -355,7 +355,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // 3.0e5 Double is turned to Real
@@ -363,7 +363,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: [3.0e5])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
@@ -372,7 +372,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(300000))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, Double(300000))
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
@@ -385,7 +385,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, Double(300000))
                 XCTAssertEqual((dbv.value() as Double), Double(300000))
                 
-                return .Rollback
+                return .rollback
             }
             
             // 1.0e20 Double is turned to Real
@@ -393,20 +393,20 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: [1.0e20])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage (avoid Int, Int32 and Int64 since 1.0e20 does not fit)
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 1e20)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
                 XCTAssertEqual((dbv.value() as Double?)!, 1e20)
                 XCTAssertEqual((dbv.value() as Double), 1e20)
 
-                return .Rollback
+                return .rollback
             }
             
             // "3.0e+5" is turned to Real
@@ -414,7 +414,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: ["3.0e+5"])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
@@ -423,7 +423,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(300000))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, Double(300000))
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
@@ -436,7 +436,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, Double(300000))
                 XCTAssertEqual((dbv.value() as Double), Double(300000))
                 
-                return .Rollback
+                return .rollback
             }
             
             // "1.0e+20" is turned to Real
@@ -444,28 +444,28 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: ["1.0e+20"])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage: (avoid Int, Int32 and Int64 since 1.0e20 does not fit)
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 1e20)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
                 XCTAssertEqual((dbv.value() as Double?)!, 1e20)
                 XCTAssertEqual((dbv.value() as Double), 1e20)
                 
-                return .Rollback
+                return .rollback
             }
             
-            // "fooéı👨👨🏿🇫🇷🇨🇮" is turned to Text
+            // "'fooéı👨👨🏿🇫🇷🇨🇮'" is turned to Text
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮"])
+                try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'"])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -473,21 +473,21 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int32.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(String.fromDatabaseValue(dbv)!, "fooéı👨👨🏿🇫🇷🇨🇮")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertEqual(String.fromDatabaseValue(dbv)!, "'fooéı👨👨🏿🇫🇷🇨🇮'")
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
-                XCTAssertEqual((dbv.value() as String?)!, "fooéı👨👨🏿🇫🇷🇨🇮")
-                XCTAssertEqual((dbv.value() as String), "fooéı👨👨🏿🇫🇷🇨🇮")
+                XCTAssertEqual((dbv.value() as String?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'")
+                XCTAssertEqual((dbv.value() as String), "'fooéı👨👨🏿🇫🇷🇨🇮'")
                 
-                return .Rollback
+                return .rollback
             }
             
             // Blob is turned to Blob
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)])
+                try db.execute("INSERT INTO `values` (realAffinity) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8)])
                 let dbv = Row.fetchOne(db, "SELECT realAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Blob)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.blob)
                 
                 // Check GRDB conversions from Blob storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -496,12 +496,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(NSData.fromDatabaseValue(dbv), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
+                XCTAssertEqual(Data.fromDatabaseValue(dbv), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                XCTAssertEqual((dbv.value() as NSData?), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
-                XCTAssertTrue((dbv.value() as NSData).isEqualToData("fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)!))
+                XCTAssertEqual((dbv.value() as Data?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
+                XCTAssertEqual((dbv.value() as Data), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                return .Rollback
+                return .rollback
             }
         }
     }
@@ -521,7 +521,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: [0 as Int])
                 let dbv = Row.fetchOne(db, "SELECT noneAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -530,7 +530,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -543,7 +543,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int64 is turned to Integer
@@ -551,7 +551,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: [0 as Int64])
                 let dbv = Row.fetchOne(db, "SELECT noneAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -560,7 +560,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -573,7 +573,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int32 is turned to Integer
@@ -581,7 +581,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: [0 as Int32])
                 let dbv = Row.fetchOne(db, "SELECT noneAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -590,7 +590,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -603,7 +603,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Double is turned to Real
@@ -611,7 +611,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: [0.0])
                 let dbv = Row.fetchOne(db, "SELECT noneAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -620,7 +620,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -633,7 +633,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // "3.0e+5" is turned to Text
@@ -641,7 +641,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: ["3.0e+5"])
                 let dbv = Row.fetchOne(db, "SELECT noneAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -650,20 +650,20 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertEqual(String.fromDatabaseValue(dbv)!, "3.0e+5")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as String?)!, "3.0e+5")
                 XCTAssertEqual((dbv.value() as String), "3.0e+5")
                 
-                return .Rollback
+                return .rollback
             }
             
             // Blob is turned to Blob
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)])
+                try db.execute("INSERT INTO `values` (noneAffinity) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8)])
                 let dbv = Row.fetchOne(db, "SELECT noneAffinity FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Blob)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.blob)
                 
                 // Check GRDB conversions from Blob storage
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -672,17 +672,17 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(NSData.fromDatabaseValue(dbv), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
+                XCTAssertEqual(Data.fromDatabaseValue(dbv), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                XCTAssertEqual((dbv.value() as NSData?), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
-                XCTAssertTrue((dbv.value() as NSData).isEqualToData("fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)!))
+                XCTAssertEqual((dbv.value() as Data?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
+                XCTAssertEqual((dbv.value() as Data), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                return .Rollback
+                return .rollback
             }
         }
     }
     
-    func testNumericAffinity(columnName: String) {
+    func testNumericAffinity(_ columnName: String) {
         // https://www.sqlite.org/datatype3.html
         //
         // > A column with NUMERIC affinity may contain values using all five
@@ -711,7 +711,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: [0 as Int])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -720,7 +720,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -733,7 +733,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int64 is turned to Integer
@@ -741,7 +741,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: [0 as Int64])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -750,7 +750,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -763,7 +763,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // Int32 is turned to Integer
@@ -771,7 +771,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: [0 as Int32])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, false)
@@ -780,7 +780,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(0))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 0.0)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, false)
                 XCTAssertEqual((dbv.value() as Bool), false)
@@ -793,7 +793,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, 0.0)
                 XCTAssertEqual((dbv.value() as Double), 0.0)
                 
-                return .Rollback
+                return .rollback
             }
             
             // 3.0e5 Double is turned to Integer
@@ -801,7 +801,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: [3.0e5])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
@@ -810,7 +810,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(300000))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, Double(300000))
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
@@ -823,7 +823,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, Double(300000))
                 XCTAssertEqual((dbv.value() as Double), Double(300000))
                 
-                return .Rollback
+                return .rollback
             }
             
             // 1.0e20 Double is turned to Real
@@ -831,20 +831,20 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: [1.0e20])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage (avoid Int, Int32 and Int64 since 1.0e20 does not fit)
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 1e20)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
                 XCTAssertEqual((dbv.value() as Double?)!, 1e20)
                 XCTAssertEqual((dbv.value() as Double), 1e20)
                 
-                return .Rollback
+                return .rollback
             }
             
             // "3.0e+5" is turned to Integer
@@ -852,7 +852,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: ["3.0e+5"])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Integer)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.integer)
                 
                 // Check GRDB conversions from Integer storage
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
@@ -861,7 +861,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual(Int64.fromDatabaseValue(dbv)!, Int64(300000))
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, Double(300000))
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
@@ -874,7 +874,7 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertEqual((dbv.value() as Double?)!, Double(300000))
                 XCTAssertEqual((dbv.value() as Double), Double(300000))
                 
-                return .Rollback
+                return .rollback
             }
             
             // "1.0e+20" is turned to Real
@@ -882,28 +882,28 @@ class DatabaseValueConversionTests : GRDBTestCase {
             try dbQueue.inTransaction { db in
                 try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: ["1.0e+20"])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Real)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.real)
                 
                 // Check GRDB conversions from Real storage: (avoid Int, Int32 and Int64 since 1.0e20 does not fit)
                 XCTAssertEqual(Bool.fromDatabaseValue(dbv)!, true)
                 XCTAssertEqual(Double.fromDatabaseValue(dbv)!, 1e20)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
                 XCTAssertEqual((dbv.value() as Bool?)!, true)
                 XCTAssertEqual((dbv.value() as Bool), true)
                 XCTAssertEqual((dbv.value() as Double?)!, 1e20)
                 XCTAssertEqual((dbv.value() as Double), 1e20)
                 
-                return .Rollback
+                return .rollback
             }
             
-            // "fooéı👨👨🏿🇫🇷🇨🇮" is turned to Text
+            // "'fooéı👨👨🏿🇫🇷🇨🇮'" is turned to Text
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮"])
+                try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'"])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Text)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.text)
                 
                 // Check GRDB conversions from Text storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -911,21 +911,21 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int32.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(String.fromDatabaseValue(dbv)!, "fooéı👨👨🏿🇫🇷🇨🇮")
-                XCTAssertTrue(NSData.fromDatabaseValue(dbv) == nil)
+                XCTAssertEqual(String.fromDatabaseValue(dbv)!, "'fooéı👨👨🏿🇫🇷🇨🇮'")
+                XCTAssertTrue(Data.fromDatabaseValue(dbv) == nil)
                 
-                XCTAssertEqual((dbv.value() as String?)!, "fooéı👨👨🏿🇫🇷🇨🇮")
-                XCTAssertEqual((dbv.value() as String), "fooéı👨👨🏿🇫🇷🇨🇮")
+                XCTAssertEqual((dbv.value() as String?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'")
+                XCTAssertEqual((dbv.value() as String), "'fooéı👨👨🏿🇫🇷🇨🇮'")
                 
-                return .Rollback
+                return .rollback
             }
             
             // Blob is turned to Blob
             
             try dbQueue.inTransaction { db in
-                try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: ["fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)])
+                try db.execute("INSERT INTO `values` (\(columnName)) VALUES (?)", arguments: ["'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8)])
                 let dbv = Row.fetchOne(db, "SELECT \(columnName) FROM `values`")!.first!.1   // first is (columnName, dbv)
-                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.Blob)
+                XCTAssertEqual(dbv.storageClass, SQLiteStorageClass.blob)
                 
                 // Check GRDB conversions from Blob storage:
                 XCTAssertTrue(Bool.fromDatabaseValue(dbv) == nil)
@@ -934,12 +934,12 @@ class DatabaseValueConversionTests : GRDBTestCase {
                 XCTAssertTrue(Int64.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(Double.fromDatabaseValue(dbv) == nil)
                 XCTAssertTrue(String.fromDatabaseValue(dbv) == nil)
-                XCTAssertEqual(NSData.fromDatabaseValue(dbv), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
+                XCTAssertEqual(Data.fromDatabaseValue(dbv), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                XCTAssertEqual((dbv.value() as NSData?), "fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding))
-                XCTAssertTrue((dbv.value() as NSData).isEqualToData("fooéı👨👨🏿🇫🇷🇨🇮".dataUsingEncoding(NSUTF8StringEncoding)!))
+                XCTAssertEqual((dbv.value() as Data?)!, "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
+                XCTAssertEqual((dbv.value() as Data), "'fooéı👨👨🏿🇫🇷🇨🇮'".data(using: .utf8))
                 
-                return .Rollback
+                return .rollback
             }
         }
     }

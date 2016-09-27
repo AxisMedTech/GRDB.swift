@@ -11,9 +11,9 @@ class DatabaseSchedulerTests: GRDBTestCase {
     
     func testDatabaseScheduler() {
         assertNoError {
-            let dbQueue1 = try makeDatabaseQueue("db1")
-            let dbQueue2 = try makeDatabaseQueue("db2")
-            let dbQueue3 = try makeDatabaseQueue("db3")
+            let dbQueue1 = try makeDatabaseQueue(filename: "db1")
+            let dbQueue2 = try makeDatabaseQueue(filename: "db2")
+            let dbQueue3 = try makeDatabaseQueue(filename: "db3")
             
             var db1: Database! = nil
             var db2: Database! = nil
@@ -54,8 +54,8 @@ class DatabaseSchedulerTests: GRDBTestCase {
     
     func testDatabaseQueueFromDatabaseQueue() {
         assertNoError {
-            let dbQueue1 = try makeDatabaseQueue("db1")
-            let dbQueue2 = try makeDatabaseQueue("db2")
+            let dbQueue1 = try makeDatabaseQueue(filename: "db1")
+            let dbQueue2 = try makeDatabaseQueue(filename: "db2")
             try dbQueue1.inDatabase { db1 in
                 try db1.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
                 try db1.execute("INSERT INTO items (id) VALUES (NULL)")
@@ -75,8 +75,8 @@ class DatabaseSchedulerTests: GRDBTestCase {
     
     func testDatabaseQueueFromDatabasePool() {
         assertNoError {
-            let dbPool1 = try makeDatabasePool("db1")
-            let dbQueue2 = try makeDatabaseQueue("db2")
+            let dbPool1 = try makeDatabasePool(filename: "db1")
+            let dbQueue2 = try makeDatabaseQueue(filename: "db2")
             try dbPool1.write { db1 in
                 try db1.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
                 try db1.execute("INSERT INTO items (id) VALUES (NULL)")
@@ -96,8 +96,8 @@ class DatabaseSchedulerTests: GRDBTestCase {
     
     func testDatabasePoolFromDatabaseQueue() {
         assertNoError {
-            let dbQueue1 = try makeDatabaseQueue("db1")
-            let dbPool2 = try makeDatabasePool("db2")
+            let dbQueue1 = try makeDatabaseQueue(filename: "db1")
+            let dbPool2 = try makeDatabasePool(filename: "db2")
             try dbQueue1.inDatabase { db1 in
                 try db1.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
                 try db1.execute("INSERT INTO items (id) VALUES (NULL)")
@@ -117,8 +117,8 @@ class DatabaseSchedulerTests: GRDBTestCase {
     
     func testDatabasePoolFromDatabasePool() {
         assertNoError {
-            let dbPool1 = try makeDatabasePool("db1")
-            let dbPool2 = try makeDatabasePool("db2")
+            let dbPool1 = try makeDatabasePool(filename: "db1")
+            let dbPool2 = try makeDatabasePool(filename: "db2")
             try dbPool1.write { db1 in
                 try db1.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
                 try db1.execute("INSERT INTO items (id) VALUES (NULL)")

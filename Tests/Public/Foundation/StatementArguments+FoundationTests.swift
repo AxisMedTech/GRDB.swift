@@ -12,7 +12,7 @@ private class NonDatabaseConvertibleObject: NSObject
 
 class StatementArgumentsFoundationTests: GRDBTestCase {
 
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createPersons") { db in
             try db.execute(
@@ -26,14 +26,14 @@ class StatementArgumentsFoundationTests: GRDBTestCase {
         try migrator.migrate(dbWriter)
     }
     
-    func testStatementArgumentsNSArrayInitializer() {
+    func testStatementArgumentsArrayInitializer() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             
             try dbQueue.inTransaction { db in
                 
-                let statement = try db.updateStatement("INSERT INTO persons (name, age) VALUES (?, ?)")
-                let persons = [ // NSArray, because of the heterogeneous values
+                let statement = try db.makeUpdateStatement("INSERT INTO persons (name, age) VALUES (?, ?)")
+                let persons: [[Any]] = [
                     ["Arthur", 41],
                     ["Barbara", 38],
                 ]
@@ -41,7 +41,7 @@ class StatementArgumentsFoundationTests: GRDBTestCase {
                     try statement.execute(arguments: StatementArguments(person)!)
                 }
                 
-                return .Commit
+                return .commit
             }
             
             dbQueue.inDatabase { db in
@@ -66,14 +66,14 @@ class StatementArgumentsFoundationTests: GRDBTestCase {
         }
     }
     
-    func testStatementArgumentsNSDictionaryInitializer() {
+    func testStatementArgumentsDictionaryInitializer() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             
             try dbQueue.inTransaction { db in
                 
-                let statement = try db.updateStatement("INSERT INTO persons (name, age) VALUES (:name, :age)")
-                let persons = [// NSDictionary, because of the heterogeneous values
+                let statement = try db.makeUpdateStatement("INSERT INTO persons (name, age) VALUES (:name, :age)")
+                let persons: [[AnyHashable: Any]] = [
                     ["name": "Arthur", "age": 41],
                     ["name": "Barbara", "age": 38],
                 ]
@@ -81,7 +81,7 @@ class StatementArgumentsFoundationTests: GRDBTestCase {
                     try statement.execute(arguments: StatementArguments(person)!)
                 }
                 
-                return .Commit
+                return .commit
             }
             
             dbQueue.inDatabase { db in
@@ -96,11 +96,11 @@ class StatementArgumentsFoundationTests: GRDBTestCase {
     }
     
     func testStatementArgumentsNSDictionaryInitializerFromInvalidNSDictionary() {
-        let dictionary: NSDictionary = ["a": NSObject()]
+        let dictionary: [AnyHashable: Any] = ["a": NSObject()]
         let arguments = StatementArguments(dictionary)
         XCTAssertTrue(arguments == nil)
         
-        let dictionaryInvalidKeyType: NSDictionary = [NSNumber(integer: 1): "bar"]
+        let dictionaryInvalidKeyType: [AnyHashable: Any] = [NSNumber(value: 1): "bar"]
         let arguments2 = StatementArguments(dictionaryInvalidKeyType)
         XCTAssertTrue(arguments2 == nil)
     }

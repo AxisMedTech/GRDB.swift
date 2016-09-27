@@ -2,7 +2,7 @@
 
 /// Record is a class that wraps a table row, or the result of any query. It is
 /// designed to be subclassed.
-public class Record : RowConvertible, TableMapping, Persistable {
+open class Record : RowConvertible, TableMapping, Persistable {
     
     // MARK: - Initializers
     
@@ -19,7 +19,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// The input row may not come straight from the database. When you want to
     /// complete your initialization after being fetched, override
     /// awakeFromFetch(row:).
-    required public init(_ row: Row) {
+    required public init(row: Row) {
     }
     
     /// Do not call this method directly.
@@ -30,7 +30,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// Record subclasses have an opportunity to complete their initialization.
     ///
     /// *Important*: subclasses must invoke super's implementation.
-    public func awakeFromFetch(row row: Row) {
+    open func awakeFromFetch(row: Row) {
         // Take care of the hasPersistentChangedValues flag. If the row does not
         /// contain all needed columns, the record turns edited.
         //
@@ -48,7 +48,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// and exists methods.
     ///
     ///     class Person : Record {
-    ///         override class func databaseTableName() -> String {
+    ///         override class var databaseTableName: String {
     ///             return "persons"
     ///         }
     ///     }
@@ -56,7 +56,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// The implementation of the base class Record raises a fatal error.
     ///
     /// - returns: The name of a database table.
-    public class func databaseTableName() -> String {
+    open class var databaseTableName: String {
         fatalError("subclass must override")
     }
     
@@ -77,7 +77,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     ///     }
     ///
     /// The implementation of the base class Record returns an empty dictionary.
-    public var persistentDictionary: [String: DatabaseValueConvertible?] {
+    open var persistentDictionary: [String: DatabaseValueConvertible?] {
         return [:]
     }
     
@@ -93,7 +93,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     ///         var id: Int64?
     ///         var name: String?
     ///
-    ///         func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    ///         func didInsert(with rowID: Int64, for column: String?) {
     ///             id = rowID
     ///         }
     ///     }
@@ -101,7 +101,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// - parameters:
     ///     - rowID: The inserted rowID.
     ///     - column: The name of the eventual INTEGER PRIMARY KEY column.
-    public func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    open func didInsert(with rowID: Int64, for column: String?) {
     }
     
     
@@ -114,9 +114,8 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// hasPersistentChangedValues flag.
     ///
     /// - returns: A copy of self.
-    @warn_unused_result
-    public func copy() -> Self {
-        let copy = self.dynamicType.init(Row(persistentDictionary))
+    open func copy() -> Self {
+        let copy = type(of: self).init(row: Row(persistentDictionary))
         copy.referenceRow = referenceRow
         return copy
     }
@@ -140,7 +139,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// false does not prevent it from turning true on subsequent modifications
     /// of the record.
     public var hasPersistentChangedValues: Bool {
-        get { return generatePersistentChangedValues().next() != nil }
+        get { return makePersistentChangedValuesIterator().next() != nil }
         set { referenceRow = newValue ? nil : Row(persistentDictionary) }
     }
     
@@ -156,22 +155,22 @@ public class Record : RowConvertible, TableMapping, Persistable {
     public var persistentChangedValues: [String: DatabaseValue?] {
         var persistentChangedValues: [String: DatabaseValue?] = [:]
         
-        for (key, value) in generatePersistentChangedValues() {
+        for (key, value) in makePersistentChangedValuesIterator() {
             persistentChangedValues[key] = value
         }
         return persistentChangedValues    
     }
     
-    // A change generator that is used by both hasPersistentChangedValues and
+    // A change iterator that is used by both hasPersistentChangedValues and
     // persistentChangedValues properties.
-    private func generatePersistentChangedValues() -> AnyGenerator<(column: String, old: DatabaseValue?)> {
+    private func makePersistentChangedValuesIterator() -> AnyIterator<(column: String, old: DatabaseValue?)> {
         let oldRow = referenceRow
-        var newValueGenerator = persistentDictionary.generate()
-        return AnyGenerator {
+        var newValueIterator = persistentDictionary.makeIterator()
+        return AnyIterator {
             // Loop until we find a change, or exhaust columns:
-            while let (column, newValue) = newValueGenerator.next() {
-                let new = newValue?.databaseValue ?? .Null
-                guard let old = oldRow?.databaseValue(named: column) else {
+            while let (column, newValue) = newValueIterator.next() {
+                let new = newValue?.databaseValue ?? .null
+                guard let oldRow = oldRow, let old: DatabaseValue = oldRow.value(named: column) else {
                     return (column: column, old: nil)
                 }
                 if new != old {
@@ -203,7 +202,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     ///
     /// - parameter db: A database connection.
     /// - throws: A DatabaseError whenever an SQLite error occurs.
-    public func insert(db: Database) throws {
+    open func insert(_ db: Database) throws {
         // The simplest code would be:
         //
         //     try performInsert(db)
@@ -216,23 +215,27 @@ public class Record : RowConvertible, TableMapping, Persistable {
         // So let's provide our custom implementation of insert, which uses the
         // same persistentDictionary for both insertion, and change tracking.
         
-        let dataMapper = DataMapper(db, self)
-        var persistentDictionary = dataMapper.persistentDictionary
-        try dataMapper.insertStatement().execute()
-        let rowID = db.lastInsertedRowID
-        let rowIDColumn = dataMapper.primaryKey?.rowIDColumn
-        didInsertWithRowID(rowID, forColumn: rowIDColumn)
+        let conflictResolutionForInsert = type(of: self).persistenceConflictPolicy.conflictResolutionForInsert
+        let dao = DAO(db, self)
+        var persistentDictionary = dao.persistentDictionary
+        try dao.insertStatement(onConflict: conflictResolutionForInsert).execute()
         
-        // Update persistentDictionary with inserted id, so that we can
-        // set hasPersistentChangedValues to false:
-        if let rowIDColumn = rowIDColumn {
-            if persistentDictionary[rowIDColumn] != nil {
-                persistentDictionary[rowIDColumn] = rowID
-            } else {
-                let rowIDColumn = rowIDColumn.lowercaseString
-                for column in persistentDictionary.keys where column.lowercaseString == rowIDColumn {
-                    persistentDictionary[column] = rowID
-                    break
+        if !conflictResolutionForInsert.invalidatesLastInsertedRowID {
+            let rowID = db.lastInsertedRowID
+            let rowIDColumn = dao.primaryKey?.rowIDColumn
+            didInsert(with: rowID, for: rowIDColumn)
+            
+            // Update persistentDictionary with inserted id, so that we can
+            // set hasPersistentChangedValues to false:
+            if let rowIDColumn = rowIDColumn {
+                if persistentDictionary[rowIDColumn] != nil {
+                    persistentDictionary[rowIDColumn] = rowID
+                } else {
+                    let rowIDColumn = rowIDColumn.lowercased()
+                    for column in persistentDictionary.keys where column.lowercased() == rowIDColumn {
+                        persistentDictionary[column] = rowID
+                        break
+                    }
                 }
             }
         }
@@ -250,13 +253,14 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// returns without error.
     ///
     /// - parameter db: A database connection.
+    /// - parameter columns: The columns to update.
     /// - throws: A DatabaseError is thrown whenever an SQLite error occurs.
-    ///   PersistenceError.NotFound is thrown if the primary key does not match
-    ///   any row in the database and record could not be updated.
-    public func update(db: Database) throws {
+    ///   PersistenceError.recordNotFound is thrown if the primary key does not
+    ///   match any row in the database and record could not be updated.
+    open func update(_ db: Database, columns: Set<String>) throws {
         // The simplest code would be:
         //
-        //     try performUpdate(db)
+        //     try performUpdate(db, columns: columns)
         //     hasPersistentChangedValues = false
         //
         // But this triggers two calls to persistentDictionary, and this is both
@@ -265,14 +269,18 @@ public class Record : RowConvertible, TableMapping, Persistable {
         //
         // So let's provide our custom implementation of insert, which uses the
         // same persistentDictionary for both update, and change tracking.
-        let dataMapper = DataMapper(db, self)
-        try dataMapper.updateStatement().execute()
+        let dao = DAO(db, self)
+        guard let statement = dao.updateStatement(columns: columns, onConflict: type(of: self).persistenceConflictPolicy.conflictResolutionForUpdate) else {
+            // Nil primary key
+            throw PersistenceError.recordNotFound(self)
+        }
+        try statement.execute()
         if db.changesCount == 0 {
-            throw PersistenceError.NotFound(self)
+            throw PersistenceError.recordNotFound(self)
         }
         
         // Set hasPersistentChangedValues to false
-        referenceRow = Row(dataMapper.persistentDictionary)
+        referenceRow = Row(dao.persistentDictionary)
     }
     
     /// Executes an INSERT or an UPDATE statement so that `self` is saved in
@@ -292,7 +300,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// - parameter db: A database connection.
     /// - throws: A DatabaseError whenever an SQLite error occurs, or errors
     ///   thrown by update().
-    final public func save(db: Database) throws {
+    final public func save(_ db: Database) throws {
         try performSave(db)
     }
     
@@ -304,7 +312,7 @@ public class Record : RowConvertible, TableMapping, Persistable {
     /// - parameter db: A database connection.
     /// - returns: Whether a database row was deleted.
     /// - throws: A DatabaseError is thrown whenever an SQLite error occurs.
-    public func delete(db: Database) throws -> Bool {
+    @discardableResult open func delete(_ db: Database) throws -> Bool {
         defer {
             // Future calls to update() will throw NotFound. Make the user
             // a favor and make sure this error is thrown even if she checks the

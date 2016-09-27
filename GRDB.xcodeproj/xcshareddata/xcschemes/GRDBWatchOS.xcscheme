@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "0730"
+   LastUpgradeVersion = "0800"
    version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -14,23 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "56AFC9EE1CB1A8BB00F48B96"
-               BuildableName = "GRDBCipher.framework"
-               BlueprintName = "GRDBCipheriOS"
-               ReferencedContainer = "container:GRDB.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "56AFCA2B1CB1AA9900F48B96"
-               BuildableName = "GRDBTests.xctest"
-               BlueprintName = "GRDBCipheriOSTests"
+               BlueprintIdentifier = "5654909F1D5A4798005622CB"
+               BuildableName = "GRDB.framework"
+               BlueprintName = "GRDBWatchOS"
                ReferencedContainer = "container:GRDB.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -42,36 +28,7 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "56AFCA2B1CB1AA9900F48B96"
-               BuildableName = "GRDBTests.xctest"
-               BlueprintName = "GRDBCipheriOSTests"
-               ReferencedContainer = "container:GRDB.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "56AFCA841CB1ABC800F48B96"
-               BuildableName = "GRDBTests.xctest"
-               BlueprintName = "GRDBCipheriOSEncryptedTests"
-               ReferencedContainer = "container:GRDB.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "56AFC9EE1CB1A8BB00F48B96"
-            BuildableName = "GRDBCipher.framework"
-            BlueprintName = "GRDBCipheriOS"
-            ReferencedContainer = "container:GRDB.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
       <AdditionalOptions>
       </AdditionalOptions>
    </TestAction>
@@ -88,9 +45,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "56AFC9EE1CB1A8BB00F48B96"
-            BuildableName = "GRDBCipher.framework"
-            BlueprintName = "GRDBCipheriOS"
+            BlueprintIdentifier = "5654909F1D5A4798005622CB"
+            BuildableName = "GRDB.framework"
+            BlueprintName = "GRDBWatchOS"
             ReferencedContainer = "container:GRDB.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -106,9 +63,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "56AFC9EE1CB1A8BB00F48B96"
-            BuildableName = "GRDBCipher.framework"
-            BlueprintName = "GRDBCipheriOS"
+            BlueprintIdentifier = "5654909F1D5A4798005622CB"
+            BuildableName = "GRDB.framework"
+            BlueprintName = "GRDBWatchOS"
             ReferencedContainer = "container:GRDB.xcodeproj">
          </BuildableReference>
       </MacroExpansion>

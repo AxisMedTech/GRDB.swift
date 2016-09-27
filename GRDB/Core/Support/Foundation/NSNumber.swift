@@ -1,6 +1,6 @@
 import Foundation
 
-private let integerRoundingBehavior = NSDecimalNumberHandler(roundingMode: .RoundPlain, scale: 0, raiseOnExactness: false, raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false)
+private let integerRoundingBehavior = NSDecimalNumberHandler(roundingMode: .plain, scale: 0, raiseOnExactness: false, raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false)
 
 /// NSNumber adopts DatabaseValueConvertible
 extension NSNumber: DatabaseValueConvertible {
@@ -8,37 +8,37 @@ extension NSNumber: DatabaseValueConvertible {
     /// Returns a value that can be stored in the database.
     public var databaseValue: DatabaseValue {
         // Don't lose precision: store integers that fits in Int64 as Int64
-        if let decimal = self as? NSDecimalNumber
-            where decimal == decimal.decimalNumberByRoundingAccordingToBehavior(integerRoundingBehavior) // integer
-                && decimal.compare(NSDecimalNumber(longLong: Int64.max)) != .OrderedDescending   // decimal <= Int64.max
-                && decimal.compare(NSDecimalNumber(longLong: Int64.min)) != .OrderedAscending    // decimal >= Int64.min
+        if let decimal = self as? NSDecimalNumber,
+            decimal == decimal.rounding(accordingToBehavior: integerRoundingBehavior),  // integer
+            decimal.compare(NSDecimalNumber(value: Int64.max)) != .orderedDescending,   // decimal <= Int64.max
+            decimal.compare(NSDecimalNumber(value: Int64.min)) != .orderedAscending     // decimal >= Int64.min
         {
-            return longLongValue.databaseValue
+            return int64Value.databaseValue
         }
         
-        switch String.fromCString(objCType)! {
+        switch String(cString: objCType) {
         case "c":
-            return Int64(charValue).databaseValue
+            return Int64(int8Value).databaseValue
         case "C":
-            return Int64(unsignedCharValue).databaseValue
+            return Int64(uint8Value).databaseValue
         case "s":
-            return Int64(shortValue).databaseValue
+            return Int64(int16Value).databaseValue
         case "S":
-            return Int64(unsignedShortValue).databaseValue
+            return Int64(uint16Value).databaseValue
         case "i":
-            return Int64(intValue).databaseValue
+            return Int64(int32Value).databaseValue
         case "I":
-            return Int64(unsignedIntValue).databaseValue
+            return Int64(uint32Value).databaseValue
         case "l":
-            return Int64(longValue).databaseValue
+            return Int64(intValue).databaseValue
         case "L":
-            let uint = unsignedLongValue
+            let uint = uintValue
             GRDBPrecondition(UInt64(uint) <= UInt64(Int64.max), "could not convert \(uint) to an Int64 that can be stored in the database")
             return Int64(uint).databaseValue
         case "q":
-            return Int64(longLongValue).databaseValue
+            return Int64(int64Value).databaseValue
         case "Q":
-            let uint64 = unsignedLongLongValue
+            let uint64 = uint64Value
             GRDBPrecondition(uint64 <= UInt64(Int64.max), "could not convert \(uint64) to an Int64 that can be stored in the database")
             return Int64(uint64).databaseValue
         case "f":
@@ -53,12 +53,12 @@ extension NSNumber: DatabaseValueConvertible {
     }
     
     /// Returns an NSNumber initialized from *databaseValue*, if possible.
-    public static func fromDatabaseValue(databaseValue: DatabaseValue) -> Self? {
+    public static func fromDatabaseValue(_ databaseValue: DatabaseValue) -> Self? {
         switch databaseValue.storage {
-        case .Int64(let int64):
-            return self.init(longLong: int64)
-        case .Double(let double):
-            return self.init(double: double)
+        case .int64(let int64):
+            return self.init(value: int64)
+        case .double(let double):
+            return self.init(value: double)
         default:
             return nil
         }

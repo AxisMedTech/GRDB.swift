@@ -5,10 +5,10 @@ import Foundation
 /// db.sqlite-journal, etc.)
 class DatabaseStore {
     let path: String
-    private let source: dispatch_source_t?
-    private let queue: dispatch_queue_t?
+    private let source: DispatchSourceFileSystemObject?
+    private let queue: DispatchQueue?
     
-    init(path: String, attributes: [String: AnyObject]?) throws {
+    init(path: String, attributes: [FileAttributeKey: Any]?) throws {
         self.path = path
         
         guard let attributes = attributes else {
@@ -18,7 +18,7 @@ class DatabaseStore {
         }
         
         let databaseFileName = (path as NSString).lastPathComponent
-        let directoryPath = (path as NSString).stringByDeletingLastPathComponent
+        let directoryPath = (path as NSString).deletingLastPathComponent
         
         // Apply file attributes on existing files
         DatabaseStore.setFileAttributes(
@@ -32,39 +32,39 @@ class DatabaseStore {
         // This require a file descriptor on the directory.
         let directoryDescriptor = open(directoryPath, O_EVTONLY)
         guard directoryDescriptor != -1 else {
-            // Let NSFileManager throw a nice NSError
-            try NSFileManager.defaultManager().contentsOfDirectoryAtPath(directoryPath)
-            // Come on, NSFileManager... OK just throw something that is somewhat relevant
+            // Let FileManager throw a nice NSError
+            try FileManager.default.contentsOfDirectory(atPath: directoryPath)
+            // Come on, FileManager... OK just throw something that is somewhat relevant
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: nil)
         }
         
-        let queue = dispatch_queue_create("GRDB.DatabaseStore", nil)
-        let source = dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, UInt(directoryDescriptor), DISPATCH_VNODE_WRITE, queue)
+        let queue = DispatchQueue(label: "GRDB.DatabaseStore")
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: Int32(directoryDescriptor), eventMask: [.write], queue: queue)
         self.queue = queue
         self.source = source
         
         // Configure dispatch source
-        dispatch_source_set_event_handler(source) {
+        source.setEventHandler {
             // Directory has been modified: apply file attributes on unprocessed files
             DatabaseStore.setFileAttributes(
                 directoryPath: directoryPath,
                 databaseFileName: databaseFileName,
                 attributes: attributes)
         }
-        dispatch_source_set_cancel_handler(source) {
+        source.setCancelHandler {
             close(directoryDescriptor)
         }
-        dispatch_resume(source)
+        source.resume()
     }
     
     deinit {
         if let source = source {
-            dispatch_source_cancel(source)
+            source.cancel()
         }
     }
     
-    private static func setFileAttributes(directoryPath directoryPath: String, databaseFileName: String, attributes: [String: AnyObject]) {
-        let fm = NSFileManager.defaultManager()
+    private static func setFileAttributes(directoryPath: String, databaseFileName: String, attributes: [FileAttributeKey: Any]) {
+        let fm = FileManager.default
         // TODO: handle symbolic links:
         //
         // According to https://www.sqlite.org/changes.html
@@ -72,10 +72,10 @@ class DatabaseStore {
         // > On unix, if a symlink to a database file is opened, then the
         // > corresponding journal files are based on the actual filename,
         // > not the symlink name.
-        let fileNames = try! fm.contentsOfDirectoryAtPath(directoryPath).filter({ $0.hasPrefix(databaseFileName) })
+        let fileNames = try! fm.contentsOfDirectory(atPath: directoryPath).filter({ $0.hasPrefix(databaseFileName) })
         for fileName in fileNames {
             do {
-                try fm.setAttributes(attributes, ofItemAtPath: (directoryPath as NSString).stringByAppendingPathComponent(fileName))
+                try fm.setAttributes(attributes, ofItemAtPath: (directoryPath as NSString).appendingPathComponent(fileName))
             } catch let error as NSError {
                 guard error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError else {
                     try! { throw error }()

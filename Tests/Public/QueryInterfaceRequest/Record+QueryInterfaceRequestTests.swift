@@ -19,14 +19,14 @@ private class Reader : Record {
         super.init()
     }
     
-    required init(_ row: Row){
+    required init(row: Row){
         self.id = row.value(named: "id")
         self.name = row.value(named: "name")
         self.age = row.value(named: "age")
-        super.init(row)
+        super.init(row: row)
     }
     
-    override static func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "readers"
     }
     
@@ -34,7 +34,7 @@ private class Reader : Record {
         return ["id": id, "name": name, "age": age]
     }
     
-    override func didInsertWithRowID(rowID: Int64, forColumn column: String?) {
+    override func didInsert(with rowID: Int64, for column: String?) {
         id = rowID
     }
 }
@@ -42,7 +42,7 @@ private class Reader : Record {
 
 class RecordQueryInterfaceRequestTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createReaders") { db in
             try db.execute(
@@ -71,7 +71,7 @@ class RecordQueryInterfaceRequestTests: GRDBTestCase {
                 
                 do {
                     let readers = request.fetchAll(db)
-                    XCTAssertEqual(self.lastSQLQuery, "SELECT * FROM \"readers\"")
+                    XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\"")
                     XCTAssertEqual(readers.count, 2)
                     XCTAssertEqual(readers[0].id!, arthur.id!)
                     XCTAssertEqual(readers[0].name, arthur.name)
@@ -83,7 +83,7 @@ class RecordQueryInterfaceRequestTests: GRDBTestCase {
                 
                 do {
                     let reader = request.fetchOne(db)!
-                    XCTAssertEqual(self.lastSQLQuery, "SELECT * FROM \"readers\"")
+                    XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\"")
                     XCTAssertEqual(reader.id!, arthur.id!)
                     XCTAssertEqual(reader.name, arthur.name)
                     XCTAssertEqual(reader.age, arthur.age)
@@ -91,7 +91,7 @@ class RecordQueryInterfaceRequestTests: GRDBTestCase {
                 
                 do {
                     let names = request.fetch(db).map { $0.name }
-                    XCTAssertEqual(self.lastSQLQuery, "SELECT * FROM \"readers\"")
+                    XCTAssertEqual(lastSQLQuery, "SELECT * FROM \"readers\"")
                     XCTAssertEqual(names, [arthur.name, barbara.name])
                 }
             }

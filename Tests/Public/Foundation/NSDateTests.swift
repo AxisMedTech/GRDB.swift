@@ -9,7 +9,7 @@ import XCTest
 
 class NSDateTests : GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("createDates") { db in
             try db.execute(
@@ -26,7 +26,7 @@ class NSDateTests : GRDBTestCase {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
                 
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
+                let calendar = Calendar(identifier: .gregorian)
                 let dateComponents = NSDateComponents()
                 dateComponents.year = 1973
                 dateComponents.month = 9
@@ -37,20 +37,20 @@ class NSDateTests : GRDBTestCase {
                 dateComponents.nanosecond = 123_456_789
                 
                 do {
-                    let date = calendar.dateFromComponents(dateComponents)!
+                    let date = calendar.date(from: dateComponents as DateComponents)!
                     try db.execute("INSERT INTO dates (creationDate) VALUES (?)", arguments: [date])
                 }
                 
                 do {
                     let date = NSDate.fetchOne(db, "SELECT creationDate FROM dates")!
                     // All components must be preserved, but nanosecond since ISO-8601 stores milliseconds.
-                    XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), dateComponents.year)
-                    XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), dateComponents.month)
-                    XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), dateComponents.day)
-                    XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), dateComponents.hour)
-                    XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), dateComponents.minute)
-                    XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), dateComponents.second)
-                    XCTAssertEqual(round(Double(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date)) / 1.0e6), round(Double(dateComponents.nanosecond) / 1.0e6))
+                    XCTAssertEqual(calendar.component(.year, from: date as Date), dateComponents.year)
+                    XCTAssertEqual(calendar.component(.month, from: date as Date), dateComponents.month)
+                    XCTAssertEqual(calendar.component(.day, from: date as Date), dateComponents.day)
+                    XCTAssertEqual(calendar.component(.hour, from: date as Date), dateComponents.hour)
+                    XCTAssertEqual(calendar.component(.minute, from: date as Date), dateComponents.minute)
+                    XCTAssertEqual(calendar.component(.second, from: date as Date), dateComponents.second)
+                    XCTAssertEqual(round(Double(calendar.component(.nanosecond, from: date as Date)) / 1.0e6), round(Double(dateComponents.nanosecond) / 1.0e6))
                 }
             }
         }
@@ -62,7 +62,7 @@ class NSDateTests : GRDBTestCase {
             try dbQueue.inDatabase { db in
                 try db.execute(
                     "INSERT INTO dates (id, creationDate) VALUES (?,?)",
-                    arguments: [1, NSDate().dateByAddingTimeInterval(-1)])
+                    arguments: [1, NSDate().addingTimeInterval(-1)])
                 
                 try db.execute(
                     "INSERT INTO dates (id) VALUES (?)",
@@ -70,7 +70,7 @@ class NSDateTests : GRDBTestCase {
                 
                 try db.execute(
                     "INSERT INTO dates (id, creationDate) VALUES (?,?)",
-                    arguments: [3, NSDate().dateByAddingTimeInterval(1)])
+                    arguments: [3, NSDate().addingTimeInterval(1)])
                 
                 let ids = Int.fetchAll(db, "SELECT id FROM dates ORDER BY creationDate")
                 XCTAssertEqual(ids, [1,2,3])
@@ -102,15 +102,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date), 0)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 0)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 0)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 0)
+                XCTAssertEqual(calendar.component(.nanosecond, from: date as Date), 0)
             }
         }
     }
@@ -123,15 +123,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22 01:02"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 2)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date), 0)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 2)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 0)
+                XCTAssertEqual(calendar.component(.nanosecond, from: date as Date), 0)
             }
         }
     }
@@ -144,15 +144,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22 01:02:03"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 2)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 3)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date), 0)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 2)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 3)
+                XCTAssertEqual(calendar.component(.nanosecond, from: date as Date), 0)
             }
         }
     }
@@ -165,15 +165,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22 01:02:03.00456"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 2)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 3)
-                XCTAssertTrue(abs(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date) - 4_000_000) < 10)  // We actually get 4_000_008. Some precision is lost during the NSDateComponents -> NSDate conversion. Not a big deal.
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 2)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 3)
+                XCTAssertTrue(abs(calendar.component(.nanosecond, from: date as Date) - 4_000_000) < 10)  // We actually get 4_000_008. Some precision is lost during the NSDateComponents -> NSDate conversion. Not a big deal.
             }
         }
     }
@@ -191,14 +191,14 @@ class NSDateTests : GRDBTestCase {
                 XCTAssertEqual(string, "2013-01-01 00:29:59")
                 
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2013)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 29)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 59)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2013)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 0)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 29)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 59)
             }
         }
     }
@@ -211,15 +211,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22T01:02"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 2)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date), 0)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 2)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 0)
+                XCTAssertEqual(calendar.component(.nanosecond, from: date as Date), 0)
             }
         }
     }
@@ -232,15 +232,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22T01:02:03"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 2)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 3)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date), 0)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 2)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 3)
+                XCTAssertEqual(calendar.component(.nanosecond, from: date as Date), 0)
             }
         }
     }
@@ -253,15 +253,15 @@ class NSDateTests : GRDBTestCase {
                     "INSERT INTO dates (creationDate) VALUES (?)",
                     arguments: ["2015-07-22T01:02:03.00456"])
                 let date = NSDate.fetchOne(db, "SELECT creationDate from dates")!
-                let calendar = NSCalendar(calendarIdentifier: NSCalendarIdentifierGregorian)!
-                calendar.timeZone = NSTimeZone(forSecondsFromGMT: 0)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Year, fromDate: date), 2015)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Month, fromDate: date), 7)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Day, fromDate: date), 22)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Hour, fromDate: date), 1)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Minute, fromDate: date), 2)
-                XCTAssertEqual(calendar.component(NSCalendarUnit.Second, fromDate: date), 3)
-                XCTAssertTrue(abs(calendar.component(NSCalendarUnit.Nanosecond, fromDate: date) - 4_000_000) < 10)  // We actually get 4_000_008. Some precision is lost during the NSDateComponents -> NSDate conversion. Not a big deal.
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                XCTAssertEqual(calendar.component(.year, from: date as Date), 2015)
+                XCTAssertEqual(calendar.component(.month, from: date as Date), 7)
+                XCTAssertEqual(calendar.component(.day, from: date as Date), 22)
+                XCTAssertEqual(calendar.component(.hour, from: date as Date), 1)
+                XCTAssertEqual(calendar.component(.minute, from: date as Date), 2)
+                XCTAssertEqual(calendar.component(.second, from: date as Date), 3)
+                XCTAssertTrue(abs(calendar.component(.nanosecond, from: date as Date) - 4_000_000) < 10)  // We actually get 4_000_008. Some precision is lost during the NSDateComponents -> NSDate conversion. Not a big deal.
             }
         }
     }

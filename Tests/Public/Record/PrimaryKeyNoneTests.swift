@@ -18,7 +18,7 @@ private class Item : Record {
         super.init()
     }
     
-    static func setupInDatabase(db: Database) throws {
+    static func setup(inDatabase db: Database) throws {
         try db.execute(
             "CREATE TABLE items (" +
                 "name TEXT," +
@@ -28,14 +28,14 @@ private class Item : Record {
     
     // Record
     
-    override class func databaseTableName() -> String {
+    override class var databaseTableName: String {
         return "items"
     }
     
-    required init(_ row: Row) {
+    required init(row: Row) {
         name = row.value(named: "name")
         email = row.value(named: "email")
-        super.init(row)
+        super.init(row: row)
     }
     
     override var persistentDictionary: [String: DatabaseValueConvertible?] {
@@ -45,9 +45,9 @@ private class Item : Record {
 
 class PrimaryKeyNoneTests: GRDBTestCase {
     
-    override func setUpDatabase(dbWriter: DatabaseWriter) throws {
+    override func setup(_ dbWriter: DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
-        migrator.registerMigration("createItem", migrate: Item.setupInDatabase)
+        migrator.registerMigration("createItem", migrate: Item.setup)
         try migrator.migrate(dbWriter)
     }
     
